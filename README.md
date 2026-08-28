@@ -37,15 +37,18 @@ LauncherBridge.exe --launch "com.epicgames.launcher://apps/Item?action=launch" -
 
 ### Options & Parameters
 
-| Parameter | Short | Required | Description | Default |
+| Parameter | Short / Aliases | Required | Description | Default |
 |---|---|---|---|---|
-| `--launch` | `-l` | **Yes*** | Launcher URI or command line to execute (*can also be passed directly as 1st positional argument) | N/A |
-| `--process` | `-p` | No | Explicit process name (without `.exe`) to override auto-detection | Auto-detect |
-| `--timeout` | `-t` | No | Timeout in seconds waiting for the game process to start | `60` |
-| `--sync-delay` | `-s` | No | Delay in seconds after game exits before closing launcher for cloud sync | `5` |
-| `--close-launcher` | `-c` | No | Close third-party launcher (e.g. Epic Games Launcher) when game exits | `false` |
-| `--verbose` | `-v` | No | Enable detailed debug logs | `false` |
-| `--help` | `-h` | No | Display help message | N/A |
+| `--launch` | `-l` | **Yes*** | Launcher URI, command line, or executable path to launch (*can also be passed directly as 1st positional argument) | N/A |
+| `--process` | `-p` | No | Explicit process name (without `.exe`) to monitor. Override auto-detection if needed | Auto-detect |
+| `--timeout` | `-t` | No | Maximum time in seconds to wait for the target game process to start | `60` |
+| `--sync-delay` | `-s`, `-d`, `--delay` | No | Delay in seconds after game exits before closing the launcher, allowing cloud saves to sync | `5` |
+| `--close-launcher` | `-c` | No | Terminate third-party launcher processes (Epic, EA App, Ubisoft, Battle.net, etc.) when game exits | `false` |
+| `--verbose` | `-v` | No | Enable detailed debug logging output | `false` |
+| `--help` | `-h`, `/?` | No | Display usage help message and exit | N/A |
+
+> **Note on Syntax**: Options can be passed as `--option value`, `-o value`, or `--option=value`. If passing arguments without flags, the 1st positional argument is treated as `--launch` command and the 2nd positional argument (if provided) is treated as `--process`.
+
 
 
 ---
