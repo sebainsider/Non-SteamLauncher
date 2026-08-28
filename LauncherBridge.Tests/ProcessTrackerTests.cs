@@ -87,6 +87,7 @@ public class ProcessTrackerTests
         var options = new Options
         {
             LaunchCommand = "com.epicgames.launcher://apps/Item?action=launch",
+            SyncDelaySeconds = 0,
             TimeoutSeconds = 5
         };
 
@@ -119,6 +120,7 @@ public class ProcessTrackerTests
         var options = new Options
         {
             LaunchCommand = "com.epicgames.launcher://apps/Item?action=launch",
+            SyncDelaySeconds = 0,
             TimeoutSeconds = 1
         };
 
@@ -138,6 +140,7 @@ public class ProcessTrackerTests
         {
             LaunchCommand = "steam://run/1091500",
             ProcessName = "Cyberpunk2077",
+            SyncDelaySeconds = 0,
             TimeoutSeconds = 5
         };
 
@@ -186,6 +189,7 @@ public class ProcessTrackerTests
         var options = new Options
         {
             LaunchCommand = "com.epicgames.launcher://apps/Item?action=launch",
+            SyncDelaySeconds = 0,
             TimeoutSeconds = 5
         };
 
@@ -212,6 +216,7 @@ public class ProcessTrackerTests
             LaunchCommand = "com.epicgames.launcher://apps/Item?action=launch",
             ProcessName = "AlanWake2",
             CloseLauncher = true,
+            SyncDelaySeconds = 0,
             TimeoutSeconds = 5
         };
 
@@ -273,6 +278,7 @@ public class ProcessTrackerTests
         var options = new Options
         {
             LaunchCommand = "com.epicgames.launcher://apps/Item?action=launch",
+            SyncDelaySeconds = 0,
             TimeoutSeconds = 5
         };
 
@@ -288,6 +294,7 @@ public class ProcessTrackerTests
         Assert.Equal(0, exitCode);
     }
 }
+
 
 
 

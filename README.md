@@ -41,9 +41,11 @@ LauncherBridge.exe --launch "com.epicgames.launcher://apps/Item?action=launch" -
 | `--launch` | `-l` | **Yes*** | Launcher URI or command line to execute (*can also be passed directly as 1st positional argument) | N/A |
 | `--process` | `-p` | No | Explicit process name (without `.exe`) to override auto-detection | Auto-detect |
 | `--timeout` | `-t` | No | Timeout in seconds waiting for the game process to start | `60` |
+| `--sync-delay` | `-s` | No | Delay in seconds after game exits before closing launcher for cloud sync | `5` |
 | `--close-launcher` | `-c` | No | Close third-party launcher (e.g. Epic Games Launcher) when game exits | `false` |
 | `--verbose` | `-v` | No | Enable detailed debug logs | `false` |
 | `--help` | `-h` | No | Display help message | N/A |
+
 
 ---
 

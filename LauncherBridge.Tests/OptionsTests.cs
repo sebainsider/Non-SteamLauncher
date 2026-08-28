@@ -102,5 +102,24 @@ public class OptionsTests
         Assert.NotNull(optionsShort);
         Assert.True(optionsShort.CloseLauncher);
     }
+
+    [Fact]
+    public void Parse_WithSyncDelayFlag_SetsSyncDelayProperty()
+    {
+        var args = new[] { "--launch", "com.epicgames.launcher://apps/Item", "--sync-delay", "10" };
+        var (options, error) = Options.Parse(args);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(10, options.SyncDelaySeconds);
+
+        var argsShort = new[] { "--launch", "com.epicgames.launcher://apps/Item", "-s", "8" };
+        var (optionsShort, errorShort) = Options.Parse(argsShort);
+
+        Assert.Null(errorShort);
+        Assert.NotNull(optionsShort);
+        Assert.Equal(8, optionsShort.SyncDelaySeconds);
+    }
 }
+
 

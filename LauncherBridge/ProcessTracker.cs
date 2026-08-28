@@ -213,6 +213,12 @@ public class ProcessTracker
         bool wasLauncherRunningInitially = CheckIfLauncherWasRunningInitially(initialSnapshot, options.LaunchCommand);
         if (options.CloseLauncher || !wasLauncherRunningInitially)
         {
+            if (options.SyncDelaySeconds > 0)
+            {
+                _logger.LogInfo($"Waiting {options.SyncDelaySeconds}s for launcher cloud saves to sync before closing...");
+                await Task.Delay(TimeSpan.FromSeconds(options.SyncDelaySeconds), cancellationToken);
+            }
+
             _logger.LogInfo("Closing third-party launcher processes (Epic Games Launcher, Epic Online Services, etc.)...");
             _provider.CloseLauncherProcesses(options.LaunchCommand);
         }
@@ -220,6 +226,7 @@ public class ProcessTracker
         _logger.LogInfo("Game session ended. LauncherBridge exiting with code 0.");
         return 0;
     }
+
 
     public async Task<bool> TrackGameSessionAsync(ProcessSnapshot initialSnapshot, Options options, CancellationToken cancellationToken)
     {

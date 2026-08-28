@@ -5,6 +5,7 @@ public class Options
     public string LaunchCommand { get; set; } = string.Empty;
     public string? ProcessName { get; set; }
     public int TimeoutSeconds { get; set; } = 60;
+    public int SyncDelaySeconds { get; set; } = 5;
     public bool CloseLauncher { get; set; }
     public bool Verbose { get; set; }
     public bool ShowHelp { get; set; }
@@ -75,6 +76,20 @@ public class Options
                 continue;
             }
 
+            if (TryParseOption(arg, "--sync-delay", "-s", args, ref i, out var syncDelayValue) ||
+                TryParseOption(arg, "--delay", "-d", args, ref i, out syncDelayValue))
+            {
+                if (int.TryParse(syncDelayValue, out var delay) && delay >= 0)
+                {
+                    options.SyncDelaySeconds = delay;
+                }
+                else
+                {
+                    return (null, $"Invalid sync delay value: '{syncDelayValue}'. Must be a non-negative integer.");
+                }
+                continue;
+            }
+
             // If an unrecognized positional argument is passed and LaunchCommand is empty, treat it as launch command if not starting with -
             if (string.IsNullOrEmpty(options.LaunchCommand) && !arg.StartsWith('-'))
             {
@@ -132,19 +147,22 @@ public class Options
         Console.WriteLine("  LauncherBridge --launch <command or URI> [options]");
         Console.WriteLine();
         Console.WriteLine("Options:");
-        Console.WriteLine("  --launch, -l <command/URI>   (Required) Command line or URI to launch the game.");
-        Console.WriteLine("  --process, -p <name>         (Optional) Specific process name to monitor (without .exe).");
-        Console.WriteLine("                               If omitted, automatically detects new processes started after launch.");
-        Console.WriteLine("  --timeout, -t <seconds>      (Optional) Maximum time to wait for the target process to start.");
-        Console.WriteLine("                               Default: 60 seconds.");
-        Console.WriteLine("  --close-launcher, -c         (Optional) Close/terminate third-party launcher processes after game exits.");
-        Console.WriteLine("  --verbose, -v                (Optional) Enable verbose debug logging.");
-        Console.WriteLine("  --help, -h                   Display this help message.");
+        Console.WriteLine("  --launch, -l <command/URI>       (Required) Command line or URI to launch the game.");
+        Console.WriteLine("  --process, -p <name>             (Optional) Specific process name to monitor (without .exe).");
+        Console.WriteLine("                                   If omitted, automatically detects new processes started after launch.");
+        Console.WriteLine("  --timeout, -t <seconds>          (Optional) Maximum time to wait for the target process to start.");
+        Console.WriteLine("                                   Default: 60 seconds.");
+        Console.WriteLine("  --sync-delay, -s <seconds>       (Optional) Delay in seconds after game exits before closing launcher,");
+        Console.WriteLine("                                   allowing cloud saves to finish syncing. Default: 5 seconds.");
+        Console.WriteLine("  --close-launcher, -c             (Optional) Close/terminate third-party launcher processes after game exits.");
+        Console.WriteLine("  --verbose, -v                    (Optional) Enable verbose debug logging.");
+        Console.WriteLine("  --help, -h                       Display this help message.");
         Console.WriteLine();
         Console.WriteLine("Examples:");
         Console.WriteLine("  LauncherBridge --launch \"com.epicgames.launcher://apps/Item?action=launch\" --close-launcher");
         Console.WriteLine("  LauncherBridge --launch \"steam://run/123456\" --process \"MyGame\"");
-        Console.WriteLine("  LauncherBridge --launch \"C:\\Games\\Launcher.exe\" --timeout 90 -c");
+        Console.WriteLine("  LauncherBridge --launch \"C:\\Games\\Launcher.exe\" --timeout 90 -c -s 7");
     }
 }
+
 
