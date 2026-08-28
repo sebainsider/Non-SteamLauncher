@@ -30,6 +30,13 @@ public class DefaultProcessProvider : IProcessProvider
         try
         {
             string cleanCommand = commandOrUri.Trim('"', '\'');
+
+            // Pre-launch check: If Epic launcher is being invoked, clean up any orphaned/zombie helpers
+            if (cleanCommand.Contains("epic", StringComparison.OrdinalIgnoreCase))
+            {
+                CleanOrphanedEpicHelpers();
+            }
+
             _logger.LogInfo($"Launching: '{cleanCommand}'");
 
             var startInfo = new ProcessStartInfo
@@ -65,11 +72,67 @@ public class DefaultProcessProvider : IProcessProvider
         }
         catch (Exception ex)
         {
+            _logger.LogWarning($"Standard Process.Start failed: {ex.Message}. Trying Windows shell fallback...");
+
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                try
+                {
+                    string cleanCommand = commandOrUri.Trim('"', '\'');
+                    var fallbackPsi = new ProcessStartInfo
+                    {
+                        FileName = "cmd.exe",
+                        Arguments = $"/c start \"\" \"{cleanCommand}\"",
+                        CreateNoWindow = true,
+                        UseShellExecute = false
+                    };
+                    using var fallbackProc = Process.Start(fallbackPsi);
+                    return true;
+                }
+                catch (Exception fallbackEx)
+                {
+                    _logger.LogError($"Windows shell fallback also failed: {fallbackEx.Message}");
+                }
+            }
+
             _logger.LogError($"Failed to launch command/URI '{commandOrUri}': {ex.Message}");
             return false;
         }
     }
 
+    private void CleanOrphanedEpicHelpers()
+    {
+        try
+        {
+            var mainProcs = Process.GetProcessesByName("EpicGamesLauncher");
+            bool isMainRunning = mainProcs.Length > 0;
+            foreach (var m in mainProcs) { m.Dispose(); }
+
+            // If main launcher is NOT running, but background helper/service is running, clean them up
+            if (!isMainRunning)
+            {
+                var helpers = new[] { "EpicWebHelper", "EpicOnlineServicesHost", "EOSOverlayRenderer" };
+                foreach (var h in helpers)
+                {
+                    var procs = Process.GetProcessesByName(h);
+                    if (procs.Length > 0)
+                    {
+                        _logger.LogDebug($"Cleaning up orphaned helper '{h}' before launch...");
+                        foreach (var p in procs)
+                        {
+                            try { p.Kill(entireProcessTree: true); } catch { }
+                            finally { p.Dispose(); }
+                        }
+                        ForceKillProcessTreeWindows(h);
+                    }
+                }
+            }
+        }
+        catch
+        {
+            // Ignore pre-launch clean errors
+        }
+    }
 
     public int GetRunningInstanceCount(string processName)
     {
@@ -109,18 +172,44 @@ public class DefaultProcessProvider : IProcessProvider
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogDebug($"Could not terminate process '{procName}' (PID: {p.Id}): {ex.Message}");
+                        _logger.LogDebug($"Could not terminate process '{procName}' via Process.Kill (PID: {p.Id}): {ex.Message}");
                     }
                     finally
                     {
                         p.Dispose();
                     }
                 }
+
+                // Reinforce on Windows with taskkill to eliminate zombie process trees
+                ForceKillProcessTreeWindows(procName);
             }
             catch
             {
                 // Ignore process enum errors
             }
+        }
+    }
+
+    private void ForceKillProcessTreeWindows(string procName)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return;
+
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "taskkill",
+                Arguments = $"/F /T /IM {procName}.exe",
+                CreateNoWindow = true,
+                UseShellExecute = false
+            };
+            using var proc = Process.Start(psi);
+            proc?.WaitForExit(2000);
+        }
+        catch
+        {
+            // Ignore if taskkill fails or is not available
         }
     }
 
@@ -173,6 +262,7 @@ public class DefaultProcessProvider : IProcessProvider
 
         return new[] { "EpicGamesLauncher", "EpicWebHelper", "EpicOnlineServicesHost", "EpicOnlineServices", "EADesktop", "UbisoftConnect", "GalaxyClient", "Battle.net" };
     }
+
 }
 
 public class ProcessTracker

@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>LauncherBridge</RootNamespace>
     <AssemblyName>LauncherBridge</AssemblyName>
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     
     <ApplicationIcon>icon.ico</ApplicationIcon>
     

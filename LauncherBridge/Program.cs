@@ -5,9 +5,15 @@ public static class Program
     public static async Task<int> Main(string[] args)
     {
         var (options, errorMessage) = Options.Parse(args);
+        var logger = new Logger(options?.Verbose ?? true);
+
+        logger.LogInfo("=== LauncherBridge Session Starting ===");
+        logger.LogInfo($"Log file: {logger.LogFilePath}");
+        logger.LogInfo($"Arguments: {string.Join(" ", args.Select(a => $"\"{a}\""))}");
 
         if (!string.IsNullOrEmpty(errorMessage))
         {
+            logger.LogError(errorMessage);
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"Error: {errorMessage}");
             Console.ResetColor();
@@ -22,21 +28,21 @@ public static class Program
             return 0;
         }
 
-        var logger = new Logger(options.Verbose);
-        logger.LogInfo("LauncherBridge starting...");
-        logger.LogDebug($"Launch Command: {options.LaunchCommand}");
+        logger.LogInfo($"Launch Command: {options.LaunchCommand}");
         if (!string.IsNullOrEmpty(options.ProcessName))
         {
-            logger.LogDebug($"Explicit Process Name: {options.ProcessName}");
+            logger.LogInfo($"Explicit Process Name: {options.ProcessName}");
         }
-        logger.LogDebug($"Timeout: {options.TimeoutSeconds}s");
+        logger.LogInfo($"Timeout: {options.TimeoutSeconds}s | Sync Delay: {options.SyncDelaySeconds}s | Close Launcher: {options.CloseLauncher}");
 
         var provider = new DefaultProcessProvider(logger);
         var tracker = new ProcessTracker(provider, logger);
 
         try
         {
-            return await tracker.RunAsync(options);
+            int result = await tracker.RunAsync(options);
+            logger.LogInfo($"LauncherBridge finished with exit code {result}");
+            return result;
         }
         catch (Exception ex)
         {
@@ -49,3 +55,4 @@ public static class Program
         }
     }
 }
+
