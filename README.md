@@ -1,7 +1,8 @@
 # LauncherBridge 🚀
 
 <p align="center">
-  <img src="LauncherBridge/icon.png" width="128" alt="LauncherBridge Icon" />
+  <img src="LauncherBridge/icon.png" width="128" alt="LauncherBridge Icon" /><br>
+  <strong>v1.5.0</strong>
 </p>
 
 **LauncherBridge** is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
