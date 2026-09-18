@@ -44,6 +44,7 @@ SteamLauncherManager.exe --launch "com.epicgames.launcher://apps/Item?action=lau
 | `--timeout` | `-t` | No | Maximum time in seconds to wait for the target game process to start | `60` |
 | `--sync-delay` | `-s`, `-d`, `--delay` | No | Delay in seconds after game exits before closing the launcher, allowing cloud saves to sync | `5` |
 | `--close-launcher` | `-c` | No | Terminate third-party launcher processes (Epic, EA App, Ubisoft, Battle.net, etc.) when game exits | `false` |
+| `--disable-overlay` | `-o`, `--kill-overlay`, `--no-overlay` | No | Terminate third-party launcher overlay processes (e.g. `EOSOverlayRenderer`) to suppress unwanted in-game popups and overlays | `false` |
 | `--verbose` | `-v` | No | Enable detailed debug logging output | `false` |
 | `--help` | `-h`, `/?` | No | Display usage help message and exit | N/A |
 
@@ -67,12 +68,12 @@ To use Steam Launcher Manager with Steam:
 ---
 
 ### 1. Epic Games Store
-Launch games via Epic Games Store URIs (add `--close-launcher` or `-c` to automatically close Epic Launcher when done):
+Launch games via Epic Games Store URIs (add `--close-launcher` / `-c` to close Epic when done, and `--disable-overlay` / `-o` to disable Epic Online Services in-game overlay):
 
 - **Target**: `"C:\Tools\SteamLauncherManager.exe"`
-- **Launch Options**: `"com.epicgames.launcher://apps/6f438871317448e8a83d42042079148d%3A5f6c8d37a1f54460a5e8f49ef2c4a9a0%3AFrogmores?action=launch&silent=true" --close-launcher`
+- **Launch Options**: `"com.epicgames.launcher://apps/6f438871317448e8a83d42042079148d%3A5f6c8d37a1f54460a5e8f49ef2c4a9a0%3AFrogmores?action=launch&silent=true" --close-launcher --disable-overlay`
 
-*Steam Launcher Manager will automatically snapshot processes, launch Epic, ignore `EpicGamesLauncher.exe`/`EpicWebHelper.exe`, detect `AlanWake2.exe`, track it to completion, and close Epic Launcher.*
+*Steam Launcher Manager will automatically snapshot processes, launch Epic, suppress intrusive overlay popups (`EOSOverlayRenderer`), detect `AlanWake2.exe`, track it to completion, and close Epic Launcher.*
 
 ---
 
