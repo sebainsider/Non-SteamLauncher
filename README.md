@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="SteamLauncherManager/icon.png" width="128" alt="Steam Launcher Manager Icon" /><br>
-  <strong>v1.5.0</strong>
+  <strong>v1.5.1</strong>
 </p>
 
 **Steam Launcher Manager** is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
