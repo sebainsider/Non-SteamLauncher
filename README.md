@@ -1,11 +1,11 @@
-# Steam Launcher Manager 🚀
+# Non-Steam Launcher 🚀
 
 <p align="center">
-  <img src="SteamLauncherManager/icon.png" width="128" alt="Steam Launcher Manager Icon" /><br>
+  <img src="NonSteamLauncher/icon.png" width="128" alt="Non-Steam Launcher Icon" /><br>
   <strong>v1.5.2</strong>
 </p>
 
-**Steam Launcher Manager** is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
+**Non-Steam Launcher** (official project name: **Non-SteamLauncher**) is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
 
 ---
 
@@ -15,7 +15,7 @@
 When you add a non-Steam game or custom launcher shortcut to Steam, Steam launches the launcher (e.g. Epic Games Launcher). When the game starts, the launcher process stays running in the background. As far as Steam is concerned, the "game" has started and never finishes, keeping your status locked to "In-Game" forever.
 
 ### The Solution (Smart Auto-Detection 🧠)
-Steam Launcher Manager automates process detection with zero configuration required for 95%+ of games:
+Non-Steam Launcher automates process detection with zero configuration required for 95%+ of games:
 
 1. **Snapshot**: Takes a snapshot of all active system processes.
 2. **Launch**: Executes the specified game URI or launcher command.
@@ -56,7 +56,7 @@ NonSteamLauncher.exe --launch "com.epicgames.launcher://apps/Item?action=launch"
 
 ## 🎮 Steam Integration Examples
 
-To use Steam Launcher Manager with Steam:
+To use Non-Steam Launcher with Steam:
 
 1. Download or publish `NonSteamLauncher.exe`.
 2. Place `NonSteamLauncher.exe` in a convenient directory (e.g., `C:\Tools\NonSteamLauncher.exe`).
@@ -73,7 +73,7 @@ Launch games via Epic Games Store URIs (add `--close-launcher` / `-c` to close E
 - **Target**: `"C:\Tools\NonSteamLauncher.exe"`
 - **Launch Options**: `"com.epicgames.launcher://apps/6f438871317448e8a83d42042079148d%3A5f6c8d37a1f54460a5e8f49ef2c4a9a0%3AFrogmores?action=launch&silent=true" --close-launcher --disable-overlay`
 
-*Steam Launcher Manager will automatically snapshot processes, launch Epic, suppress intrusive overlay popups (`EOSOverlayRenderer`), detect `AlanWake2.exe`, track it to completion, and close Epic Launcher.*
+*Non-Steam Launcher will automatically snapshot processes, launch Epic, suppress intrusive overlay popups (`EOSOverlayRenderer`), detect `AlanWake2.exe`, track it to completion, and close Epic Launcher.*
 
 ---
 
@@ -108,17 +108,17 @@ Launch games via Battle.net URIs (`battlenet://`):
 
 ## 🛠️ Building & Publishing
 
-Steam Launcher Manager is built using **.NET 9** and targets Windows. It is compiled as a self-contained, single-file executable with no external dependencies required on the target machine.
+Non-Steam Launcher is built using **.NET 9** and targets Windows. It is compiled as a self-contained, single-file executable with no external dependencies required on the target machine.
 
 ### Build & Run Tests
 ```bash
-dotnet build SteamLauncherManager.sln
-dotnet test SteamLauncherManager.sln
+dotnet build NonSteamLauncher.sln
+dotnet test NonSteamLauncher.sln
 ```
 
 ### Publish Lightweight Executable (Windows x64 - ~182 KB)
 ```bash
-dotnet publish SteamLauncherManager/SteamLauncherManager.csproj \
+dotnet publish NonSteamLauncher/NonSteamLauncher.csproj \
   -c Release \
   -r win-x64 \
   --self-contained false \
@@ -128,7 +128,7 @@ dotnet publish SteamLauncherManager/SteamLauncherManager.csproj \
 
 ### Publish Self-Contained Executable (Windows x64 - ~35 MB)
 ```bash
-dotnet publish SteamLauncherManager/SteamLauncherManager.csproj \
+dotnet publish NonSteamLauncher/NonSteamLauncher.csproj \
   -c Release \
   -r win-x64 \
   --self-contained true \
@@ -137,7 +137,11 @@ dotnet publish SteamLauncherManager/SteamLauncherManager.csproj \
 ```
 
 The published executable will be generated at:
+<<<<<<< HEAD
 `SteamLauncherManager/bin/Release/net9.0/win-x64/publish/NonSteamLauncher.exe`
+=======
+`NonSteamLauncher/bin/Release/net9.0/win-x64/publish/NonSteamLauncher.exe`
+>>>>>>> 55f1879 (Rename project to Non-Steam Launcher (NonSteamLauncher))
 
 ---
 

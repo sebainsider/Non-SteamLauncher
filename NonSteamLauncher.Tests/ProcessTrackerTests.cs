@@ -1,7 +1,7 @@
-using SteamLauncherManager;
+using NonSteamLauncher;
 using Xunit;
 
-namespace SteamLauncherManager.Tests;
+namespace NonSteamLauncher.Tests;
 
 public class MockProcessProvider : IProcessProvider
 {
@@ -221,7 +221,7 @@ public class ProcessTrackerTests
 
         int exitCode = await trackerTask;
 
-        // Steam Launcher Manager must succeed when AlanWake2 exits, even if EpicOnlineServicesHost is still running
+        // Non-Steam Launcher must succeed when AlanWake2 exits, even if EpicOnlineServicesHost is still running
         Assert.Equal(0, exitCode);
     }
 

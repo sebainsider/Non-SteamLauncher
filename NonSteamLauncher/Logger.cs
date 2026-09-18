@@ -1,4 +1,4 @@
-namespace SteamLauncherManager;
+namespace NonSteamLauncher;
 
 public enum LogLevel
 {
@@ -20,16 +20,16 @@ public class Logger
 
         string logDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "SteamLauncherManager");
+            "NonSteamLauncher");
 
         try
         {
             Directory.CreateDirectory(logDir);
-            _logFilePath = Path.Combine(logDir, "steamlaunchermanager.log");
+            _logFilePath = Path.Combine(logDir, "nonsteamlauncher.log");
         }
         catch
         {
-            _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steamlaunchermanager.log");
+            _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "nonsteamlauncher.log");
         }
     }
 

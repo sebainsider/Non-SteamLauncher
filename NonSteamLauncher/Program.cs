@@ -1,4 +1,4 @@
-namespace SteamLauncherManager;
+namespace NonSteamLauncher;
 
 public static class Program
 {
@@ -7,7 +7,7 @@ public static class Program
         var (options, errorMessage) = Options.Parse(args);
         var logger = new Logger(options?.Verbose ?? true);
 
-        logger.LogInfo("=== Steam Launcher Manager Session Starting ===");
+        logger.LogInfo("=== Non-Steam Launcher Session Starting ===");
         logger.LogInfo($"Log file: {logger.LogFilePath}");
         logger.LogInfo($"Arguments: {string.Join(" ", args.Select(a => $"\"{a}\""))}");
 
@@ -41,7 +41,7 @@ public static class Program
         try
         {
             int result = await tracker.RunAsync(options);
-            logger.LogInfo($"Steam Launcher Manager finished with exit code {result}");
+            logger.LogInfo($"Non-Steam Launcher finished with exit code {result}");
             return result;
         }
         catch (Exception ex)

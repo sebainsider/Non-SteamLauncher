@@ -5,7 +5,7 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>SteamLauncherManager</RootNamespace>
+    <RootNamespace>NonSteamLauncher</RootNamespace>
     <AssemblyName>NonSteamLauncher</AssemblyName>
     <Version>1.5.2</Version>
     

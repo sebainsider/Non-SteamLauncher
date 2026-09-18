@@ -1,4 +1,4 @@
-namespace SteamLauncherManager;
+namespace NonSteamLauncher;
 
 public class Options
 {
@@ -151,7 +151,7 @@ public class Options
 
     public static void PrintHelp()
     {
-        Console.WriteLine("Steam Launcher Manager - Steam Third-Party Launcher Monitor (.NET 9)");
+        Console.WriteLine("Non-Steam Launcher - Steam Third-Party Launcher Monitor (.NET 9)");
         Console.WriteLine();
         Console.WriteLine("Usage:");
         Console.WriteLine("  NonSteamLauncher --launch <command or URI> [options]");

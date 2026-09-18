@@ -1,7 +1,7 @@
-using SteamLauncherManager;
+using NonSteamLauncher;
 using Xunit;
 
-namespace SteamLauncherManager.Tests;
+namespace NonSteamLauncher.Tests;
 
 public class ProcessSnapshotTests
 {

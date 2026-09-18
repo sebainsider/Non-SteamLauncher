@@ -23,7 +23,7 @@ jobs:
 
       - name: Publish Executable
         run: |
-          dotnet publish SteamLauncherManager/SteamLauncherManager.csproj -c Release -r win-x64 -o ./publish
+          dotnet publish NonSteamLauncher/NonSteamLauncher.csproj -c Release -r win-x64 -o ./publish
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2

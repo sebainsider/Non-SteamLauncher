@@ -1,7 +1,7 @@
-using SteamLauncherManager;
+using NonSteamLauncher;
 using Xunit;
 
-namespace SteamLauncherManager.Tests;
+namespace NonSteamLauncher.Tests;
 
 public class LauncherFilterTests
 {
@@ -32,6 +32,7 @@ public class LauncherFilterTests
     [InlineData("LauncherBridge")]
     [InlineData("SteamLauncherManager")]
     [InlineData("NonSteamLauncher")]
+    [InlineData("Non-SteamLauncher")]
     [InlineData("NonSteamLauncher.exe")]
     public void IsLauncherOrSystemProcess_ReturnsTrue_ForKnownLaunchers(string processName)
     {

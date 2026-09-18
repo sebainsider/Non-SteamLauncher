@@ -1,4 +1,4 @@
-namespace SteamLauncherManager;
+namespace NonSteamLauncher;
 
 public static class LauncherFilter
 {
@@ -108,7 +108,8 @@ public static class LauncherFilter
         "svchost",
         "LauncherBridge",
         "SteamLauncherManager",
-        "NonSteamLauncher"
+        "NonSteamLauncher",
+        "Non-SteamLauncher"
     };
 
     private static readonly string[] KnownLauncherPrefixes = new[]

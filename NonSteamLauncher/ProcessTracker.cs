@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace SteamLauncherManager;
+namespace NonSteamLauncher;
 
 public interface IProcessProvider
 {
@@ -351,7 +351,7 @@ public class ProcessTracker
             return 1;
         }
 
-        // 4. Close launcher if --close-launcher flag is enabled OR if launcher was newly started by SteamLauncherManager
+        // 4. Close launcher if --close-launcher flag is enabled OR if launcher was newly started by NonSteamLauncher
         bool wasLauncherRunningInitially = CheckIfLauncherWasRunningInitially(initialSnapshot, options.LaunchCommand);
         if (options.CloseLauncher || !wasLauncherRunningInitially)
         {
@@ -365,7 +365,7 @@ public class ProcessTracker
             _provider.CloseLauncherProcesses(options.LaunchCommand);
         }
 
-        _logger.LogInfo("Game session ended. Steam Launcher Manager exiting with code 0.");
+        _logger.LogInfo("Game session ended. Non-Steam Launcher exiting with code 0.");
         return 0;
     }
 
