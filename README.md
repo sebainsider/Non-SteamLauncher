@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="NonSteamLauncher/icon.png" width="128" alt="Non-Steam Launcher Icon" /><br>
-  <strong>v1.5.2</strong>
+  <strong>v1.5.3</strong>
 </p>
 
 **Non-Steam Launcher** (official project name: **Non-SteamLauncher**) is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
