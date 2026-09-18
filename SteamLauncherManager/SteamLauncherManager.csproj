@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <RootNamespace>SteamLauncherManager</RootNamespace>
     <AssemblyName>NonSteamLauncher</AssemblyName>
-    <Version>1.5.1</Version>
+    <Version>1.5.2</Version>
     
     <ApplicationIcon>icon.ico</ApplicationIcon>
     
