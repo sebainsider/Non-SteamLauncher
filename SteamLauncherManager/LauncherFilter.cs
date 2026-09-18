@@ -107,7 +107,8 @@ public static class LauncherFilter
         "dllhost",
         "svchost",
         "LauncherBridge",
-        "SteamLauncherManager"
+        "SteamLauncherManager",
+        "NonSteamLauncher"
     };
 
     private static readonly string[] KnownLauncherPrefixes = new[]

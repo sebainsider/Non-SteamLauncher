@@ -154,7 +154,7 @@ public class Options
         Console.WriteLine("Steam Launcher Manager - Steam Third-Party Launcher Monitor (.NET 9)");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  SteamLauncherManager --launch <command or URI> [options]");
+        Console.WriteLine("  NonSteamLauncher --launch <command or URI> [options]");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --launch, -l <command/URI>       (Required) Command line or URI to launch the game.");
@@ -171,9 +171,9 @@ public class Options
         Console.WriteLine("  --help, -h                       Display this help message.");
         Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  SteamLauncherManager --launch \"com.epicgames.launcher://apps/Item?action=launch\" --close-launcher --disable-overlay");
-        Console.WriteLine("  SteamLauncherManager --launch \"steam://run/123456\" --process \"MyGame\"");
-        Console.WriteLine("  SteamLauncherManager --launch \"C:\\Games\\Launcher.exe\" --timeout 90 -c -s 7 -o");
+        Console.WriteLine("  NonSteamLauncher --launch \"com.epicgames.launcher://apps/Item?action=launch\" --close-launcher --disable-overlay");
+        Console.WriteLine("  NonSteamLauncher --launch \"steam://run/123456\" --process \"MyGame\"");
+        Console.WriteLine("  NonSteamLauncher --launch \"C:\\Games\\Launcher.exe\" --timeout 90 -c -s 7 -o");
     }
 }
 

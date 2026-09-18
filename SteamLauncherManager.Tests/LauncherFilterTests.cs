@@ -31,6 +31,8 @@ public class LauncherFilterTests
     [InlineData("powershell")]
     [InlineData("LauncherBridge")]
     [InlineData("SteamLauncherManager")]
+    [InlineData("NonSteamLauncher")]
+    [InlineData("NonSteamLauncher.exe")]
     public void IsLauncherOrSystemProcess_ReturnsTrue_ForKnownLaunchers(string processName)
     {
         Assert.True(LauncherFilter.IsLauncherOrSystemProcess(processName));

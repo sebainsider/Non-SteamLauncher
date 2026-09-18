@@ -28,11 +28,11 @@ Steam Launcher Manager automates process detection with zero configuration requi
 
 ### Basic Usage (Auto-Detection)
 ```cmd
-SteamLauncherManager.exe "com.epicgames.launcher://apps/Item?action=launch"
+NonSteamLauncher.exe "com.epicgames.launcher://apps/Item?action=launch"
 ```
 *(You can also explicitly pass `--launch` / `-l`)*:
 ```cmd
-SteamLauncherManager.exe --launch "com.epicgames.launcher://apps/Item?action=launch" --close-launcher
+NonSteamLauncher.exe --launch "com.epicgames.launcher://apps/Item?action=launch" --close-launcher
 ```
 
 ### Options & Parameters
@@ -58,10 +58,10 @@ SteamLauncherManager.exe --launch "com.epicgames.launcher://apps/Item?action=lau
 
 To use Steam Launcher Manager with Steam:
 
-1. Download or publish `SteamLauncherManager.exe`.
-2. Place `SteamLauncherManager.exe` in a convenient directory (e.g., `C:\Tools\SteamLauncherManager.exe`).
+1. Download or publish `NonSteamLauncher.exe`.
+2. Place `NonSteamLauncher.exe` in a convenient directory (e.g., `C:\Tools\NonSteamLauncher.exe`).
 3. In Steam, click **Games** -> **Add a Non-Steam Game to My Library...**
-4. Select `SteamLauncherManager.exe`.
+4. Select `NonSteamLauncher.exe`.
 5. Right-click the newly added shortcut in Steam -> **Properties**.
 6. Set the **Target** and **Launch Options** as shown in the examples below:
 
@@ -70,7 +70,7 @@ To use Steam Launcher Manager with Steam:
 ### 1. Epic Games Store
 Launch games via Epic Games Store URIs (add `--close-launcher` / `-c` to close Epic when done, and `--disable-overlay` / `-o` to disable Epic Online Services in-game overlay):
 
-- **Target**: `"C:\Tools\SteamLauncherManager.exe"`
+- **Target**: `"C:\Tools\NonSteamLauncher.exe"`
 - **Launch Options**: `"com.epicgames.launcher://apps/6f438871317448e8a83d42042079148d%3A5f6c8d37a1f54460a5e8f49ef2c4a9a0%3AFrogmores?action=launch&silent=true" --close-launcher --disable-overlay`
 
 *Steam Launcher Manager will automatically snapshot processes, launch Epic, suppress intrusive overlay popups (`EOSOverlayRenderer`), detect `AlanWake2.exe`, track it to completion, and close Epic Launcher.*
@@ -80,12 +80,12 @@ Launch games via Epic Games Store URIs (add `--close-launcher` / `-c` to close E
 ### 2. EA App
 Launch games via EA App protocol URIs or executables:
 
-- **Target**: `"C:\Tools\SteamLauncherManager.exe"`
+- **Target**: `"C:\Tools\NonSteamLauncher.exe"`
 - **Launch Options**: `"origin2://game/launch?offerIds=1000001&authCode=" --close-launcher`
 
 *(Optional fallback if auto-detect is bypassed)*:
 ```cmd
-SteamLauncherManager.exe "origin2://game/launch?offerIds=1000001" --process "EASportsFC24" --close-launcher
+NonSteamLauncher.exe "origin2://game/launch?offerIds=1000001" --process "EASportsFC24" --close-launcher
 ```
 
 ---
@@ -93,7 +93,7 @@ SteamLauncherManager.exe "origin2://game/launch?offerIds=1000001" --process "EAS
 ### 3. Ubisoft Connect
 Launch games via Ubisoft Connect URIs (`uplay://launch/<GameID>/0`):
 
-- **Target**: `"C:\Tools\SteamLauncherManager.exe"`
+- **Target**: `"C:\Tools\NonSteamLauncher.exe"`
 - **Launch Options**: `"uplay://launch/5105/0" --close-launcher`
 
 ---
@@ -101,7 +101,7 @@ Launch games via Ubisoft Connect URIs (`uplay://launch/<GameID>/0`):
 ### 4. Battle.net
 Launch games via Battle.net URIs (`battlenet://`):
 
-- **Target**: `"C:\Tools\SteamLauncherManager.exe"`
+- **Target**: `"C:\Tools\NonSteamLauncher.exe"`
 - **Launch Options**: `"battlenet://Fen" --close-launcher`
 
 ---
@@ -137,7 +137,7 @@ dotnet publish SteamLauncherManager/SteamLauncherManager.csproj \
 ```
 
 The published executable will be generated at:
-`SteamLauncherManager/bin/Release/net9.0/win-x64/publish/SteamLauncherManager.exe`
+`SteamLauncherManager/bin/Release/net9.0/win-x64/publish/NonSteamLauncher.exe`
 
 ---
 

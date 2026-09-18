@@ -6,7 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>SteamLauncherManager</RootNamespace>
-    <AssemblyName>SteamLauncherManager</AssemblyName>
+    <AssemblyName>NonSteamLauncher</AssemblyName>
     <Version>1.5.1</Version>
     
     <ApplicationIcon>icon.ico</ApplicationIcon>
