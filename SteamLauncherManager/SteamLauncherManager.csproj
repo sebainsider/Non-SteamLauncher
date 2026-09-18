@@ -5,8 +5,8 @@
     <TargetFramework>net9.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <RootNamespace>LauncherBridge</RootNamespace>
-    <AssemblyName>LauncherBridge</AssemblyName>
+    <RootNamespace>SteamLauncherManager</RootNamespace>
+    <AssemblyName>SteamLauncherManager</AssemblyName>
     <Version>1.5.0</Version>
     
     <ApplicationIcon>icon.ico</ApplicationIcon>

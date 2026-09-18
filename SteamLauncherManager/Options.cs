@@ -1,4 +1,4 @@
-namespace LauncherBridge;
+namespace SteamLauncherManager;
 
 public class Options
 {
@@ -7,6 +7,7 @@ public class Options
     public int TimeoutSeconds { get; set; } = 60;
     public int SyncDelaySeconds { get; set; } = 5;
     public bool CloseLauncher { get; set; }
+    public bool DisableOverlay { get; set; }
     public bool Verbose { get; set; }
     public bool ShowHelp { get; set; }
 
@@ -43,6 +44,15 @@ public class Options
                 arg.Equals("-c", StringComparison.OrdinalIgnoreCase))
             {
                 options.CloseLauncher = true;
+                continue;
+            }
+
+            if (arg.Equals("--disable-overlay", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("-o", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--kill-overlay", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--no-overlay", StringComparison.OrdinalIgnoreCase))
+            {
+                options.DisableOverlay = true;
                 continue;
             }
 
@@ -141,10 +151,10 @@ public class Options
 
     public static void PrintHelp()
     {
-        Console.WriteLine("LauncherBridge - Steam Third-Party Launcher Monitor (.NET 9)");
+        Console.WriteLine("Steam Launcher Manager - Steam Third-Party Launcher Monitor (.NET 9)");
         Console.WriteLine();
         Console.WriteLine("Usage:");
-        Console.WriteLine("  LauncherBridge --launch <command or URI> [options]");
+        Console.WriteLine("  SteamLauncherManager --launch <command or URI> [options]");
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --launch, -l <command/URI>       (Required) Command line or URI to launch the game.");
@@ -155,13 +165,15 @@ public class Options
         Console.WriteLine("  --sync-delay, -s <seconds>       (Optional) Delay in seconds after game exits before closing launcher,");
         Console.WriteLine("                                   allowing cloud saves to finish syncing. Default: 5 seconds.");
         Console.WriteLine("  --close-launcher, -c             (Optional) Close/terminate third-party launcher processes after game exits.");
+        Console.WriteLine("  --disable-overlay, -o            (Optional) Terminate launcher overlay processes (e.g. EOSOverlayRenderer)");
+        Console.WriteLine("                                   to suppress in-game popups and notifications.");
         Console.WriteLine("  --verbose, -v                    (Optional) Enable verbose debug logging.");
         Console.WriteLine("  --help, -h                       Display this help message.");
         Console.WriteLine();
         Console.WriteLine("Examples:");
-        Console.WriteLine("  LauncherBridge --launch \"com.epicgames.launcher://apps/Item?action=launch\" --close-launcher");
-        Console.WriteLine("  LauncherBridge --launch \"steam://run/123456\" --process \"MyGame\"");
-        Console.WriteLine("  LauncherBridge --launch \"C:\\Games\\Launcher.exe\" --timeout 90 -c -s 7");
+        Console.WriteLine("  SteamLauncherManager --launch \"com.epicgames.launcher://apps/Item?action=launch\" --close-launcher --disable-overlay");
+        Console.WriteLine("  SteamLauncherManager --launch \"steam://run/123456\" --process \"MyGame\"");
+        Console.WriteLine("  SteamLauncherManager --launch \"C:\\Games\\Launcher.exe\" --timeout 90 -c -s 7 -o");
     }
 }
 

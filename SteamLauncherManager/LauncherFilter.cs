@@ -1,4 +1,4 @@
-namespace LauncherBridge;
+namespace SteamLauncherManager;
 
 public static class LauncherFilter
 {
@@ -106,7 +106,8 @@ public static class LauncherFilter
         "rundll32",
         "dllhost",
         "svchost",
-        "LauncherBridge"
+        "LauncherBridge",
+        "SteamLauncherManager"
     };
 
     private static readonly string[] KnownLauncherPrefixes = new[]

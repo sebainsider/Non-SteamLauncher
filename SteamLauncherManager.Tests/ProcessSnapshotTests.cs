@@ -1,7 +1,7 @@
-using LauncherBridge;
+using SteamLauncherManager;
 using Xunit;
 
-namespace LauncherBridge.Tests;
+namespace SteamLauncherManager.Tests;
 
 public class ProcessSnapshotTests
 {

@@ -1,7 +1,7 @@
-using LauncherBridge;
+using SteamLauncherManager;
 using Xunit;
 
-namespace LauncherBridge.Tests;
+namespace SteamLauncherManager.Tests;
 
 public class LauncherFilterTests
 {
@@ -30,6 +30,7 @@ public class LauncherFilterTests
     [InlineData("cmd.exe")]
     [InlineData("powershell")]
     [InlineData("LauncherBridge")]
+    [InlineData("SteamLauncherManager")]
     public void IsLauncherOrSystemProcess_ReturnsTrue_ForKnownLaunchers(string processName)
     {
         Assert.True(LauncherFilter.IsLauncherOrSystemProcess(processName));

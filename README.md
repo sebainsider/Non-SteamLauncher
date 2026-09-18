@@ -1,11 +1,11 @@
-# LauncherBridge 🚀
+# Steam Launcher Manager 🚀
 
 <p align="center">
-  <img src="LauncherBridge/icon.png" width="128" alt="LauncherBridge Icon" /><br>
+  <img src="SteamLauncherManager/icon.png" width="128" alt="Steam Launcher Manager Icon" /><br>
   <strong>v1.5.0</strong>
 </p>
 
-**LauncherBridge** is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
+**Steam Launcher Manager** is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
 
 ---
 
@@ -15,7 +15,7 @@
 When you add a non-Steam game or custom launcher shortcut to Steam, Steam launches the launcher (e.g. Epic Games Launcher). When the game starts, the launcher process stays running in the background. As far as Steam is concerned, the "game" has started and never finishes, keeping your status locked to "In-Game" forever.
 
 ### The Solution (Smart Auto-Detection 🧠)
-LauncherBridge automates process detection with zero configuration required for 95%+ of games:
+Steam Launcher Manager automates process detection with zero configuration required for 95%+ of games:
 
 1. **Snapshot**: Takes a snapshot of all active system processes.
 2. **Launch**: Executes the specified game URI or launcher command.
@@ -28,11 +28,11 @@ LauncherBridge automates process detection with zero configuration required for 
 
 ### Basic Usage (Auto-Detection)
 ```cmd
-LauncherBridge.exe "com.epicgames.launcher://apps/Item?action=launch"
+SteamLauncherManager.exe "com.epicgames.launcher://apps/Item?action=launch"
 ```
 *(You can also explicitly pass `--launch` / `-l`)*:
 ```cmd
-LauncherBridge.exe --launch "com.epicgames.launcher://apps/Item?action=launch" --close-launcher
+SteamLauncherManager.exe --launch "com.epicgames.launcher://apps/Item?action=launch" --close-launcher
 ```
 
 ### Options & Parameters
@@ -55,12 +55,12 @@ LauncherBridge.exe --launch "com.epicgames.launcher://apps/Item?action=launch" -
 
 ## 🎮 Steam Integration Examples
 
-To use LauncherBridge with Steam:
+To use Steam Launcher Manager with Steam:
 
-1. Download or publish `LauncherBridge.exe`.
-2. Place `LauncherBridge.exe` in a convenient directory (e.g., `C:\Tools\LauncherBridge.exe`).
+1. Download or publish `SteamLauncherManager.exe`.
+2. Place `SteamLauncherManager.exe` in a convenient directory (e.g., `C:\Tools\SteamLauncherManager.exe`).
 3. In Steam, click **Games** -> **Add a Non-Steam Game to My Library...**
-4. Select `LauncherBridge.exe`.
+4. Select `SteamLauncherManager.exe`.
 5. Right-click the newly added shortcut in Steam -> **Properties**.
 6. Set the **Target** and **Launch Options** as shown in the examples below:
 
@@ -69,22 +69,22 @@ To use LauncherBridge with Steam:
 ### 1. Epic Games Store
 Launch games via Epic Games Store URIs (add `--close-launcher` or `-c` to automatically close Epic Launcher when done):
 
-- **Target**: `"C:\Tools\LauncherBridge.exe"`
+- **Target**: `"C:\Tools\SteamLauncherManager.exe"`
 - **Launch Options**: `"com.epicgames.launcher://apps/6f438871317448e8a83d42042079148d%3A5f6c8d37a1f54460a5e8f49ef2c4a9a0%3AFrogmores?action=launch&silent=true" --close-launcher`
 
-*LauncherBridge will automatically snapshot processes, launch Epic, ignore `EpicGamesLauncher.exe`/`EpicWebHelper.exe`, detect `AlanWake2.exe`, track it to completion, and close Epic Launcher.*
+*Steam Launcher Manager will automatically snapshot processes, launch Epic, ignore `EpicGamesLauncher.exe`/`EpicWebHelper.exe`, detect `AlanWake2.exe`, track it to completion, and close Epic Launcher.*
 
 ---
 
 ### 2. EA App
 Launch games via EA App protocol URIs or executables:
 
-- **Target**: `"C:\Tools\LauncherBridge.exe"`
+- **Target**: `"C:\Tools\SteamLauncherManager.exe"`
 - **Launch Options**: `"origin2://game/launch?offerIds=1000001&authCode=" --close-launcher`
 
 *(Optional fallback if auto-detect is bypassed)*:
 ```cmd
-LauncherBridge.exe "origin2://game/launch?offerIds=1000001" --process "EASportsFC24" --close-launcher
+SteamLauncherManager.exe "origin2://game/launch?offerIds=1000001" --process "EASportsFC24" --close-launcher
 ```
 
 ---
@@ -92,7 +92,7 @@ LauncherBridge.exe "origin2://game/launch?offerIds=1000001" --process "EASportsF
 ### 3. Ubisoft Connect
 Launch games via Ubisoft Connect URIs (`uplay://launch/<GameID>/0`):
 
-- **Target**: `"C:\Tools\LauncherBridge.exe"`
+- **Target**: `"C:\Tools\SteamLauncherManager.exe"`
 - **Launch Options**: `"uplay://launch/5105/0" --close-launcher`
 
 ---
@@ -100,24 +100,24 @@ Launch games via Ubisoft Connect URIs (`uplay://launch/<GameID>/0`):
 ### 4. Battle.net
 Launch games via Battle.net URIs (`battlenet://`):
 
-- **Target**: `"C:\Tools\LauncherBridge.exe"`
+- **Target**: `"C:\Tools\SteamLauncherManager.exe"`
 - **Launch Options**: `"battlenet://Fen" --close-launcher`
 
 ---
 
 ## 🛠️ Building & Publishing
 
-LauncherBridge is built using **.NET 9** and targets Windows. It is compiled as a self-contained, single-file executable with no external dependencies required on the target machine.
+Steam Launcher Manager is built using **.NET 9** and targets Windows. It is compiled as a self-contained, single-file executable with no external dependencies required on the target machine.
 
 ### Build & Run Tests
 ```bash
-dotnet build LauncherBridge.sln
-dotnet test LauncherBridge.sln
+dotnet build SteamLauncherManager.sln
+dotnet test SteamLauncherManager.sln
 ```
 
 ### Publish Lightweight Executable (Windows x64 - ~182 KB)
 ```bash
-dotnet publish LauncherBridge/LauncherBridge.csproj \
+dotnet publish SteamLauncherManager/SteamLauncherManager.csproj \
   -c Release \
   -r win-x64 \
   --self-contained false \
@@ -127,7 +127,7 @@ dotnet publish LauncherBridge/LauncherBridge.csproj \
 
 ### Publish Self-Contained Executable (Windows x64 - ~35 MB)
 ```bash
-dotnet publish LauncherBridge/LauncherBridge.csproj \
+dotnet publish SteamLauncherManager/SteamLauncherManager.csproj \
   -c Release \
   -r win-x64 \
   --self-contained true \
@@ -136,7 +136,7 @@ dotnet publish LauncherBridge/LauncherBridge.csproj \
 ```
 
 The published executable will be generated at:
-`LauncherBridge/bin/Release/net9.0/win-x64/publish/LauncherBridge.exe`
+`SteamLauncherManager/bin/Release/net9.0/win-x64/publish/SteamLauncherManager.exe`
 
 ---
 

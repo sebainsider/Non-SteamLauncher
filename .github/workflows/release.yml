@@ -23,12 +23,12 @@ jobs:
 
       - name: Publish Executable
         run: |
-          dotnet publish LauncherBridge/LauncherBridge.csproj -c Release -r win-x64 -o ./publish
+          dotnet publish SteamLauncherManager/SteamLauncherManager.csproj -c Release -r win-x64 -o ./publish
 
       - name: Create Release and Upload Assets
         uses: softprops/action-gh-release@v2
         with:
-          files: ./publish/LauncherBridge.exe
+          files: ./publish/SteamLauncherManager.exe
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

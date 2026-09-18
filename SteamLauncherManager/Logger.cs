@@ -1,4 +1,4 @@
-namespace LauncherBridge;
+namespace SteamLauncherManager;
 
 public enum LogLevel
 {
@@ -20,16 +20,16 @@ public class Logger
 
         string logDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "LauncherBridge");
+            "SteamLauncherManager");
 
         try
         {
             Directory.CreateDirectory(logDir);
-            _logFilePath = Path.Combine(logDir, "launcherbridge.log");
+            _logFilePath = Path.Combine(logDir, "steamlaunchermanager.log");
         }
         catch
         {
-            _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "launcherbridge.log");
+            _logFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "steamlaunchermanager.log");
         }
     }
 

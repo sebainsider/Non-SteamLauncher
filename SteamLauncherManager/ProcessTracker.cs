@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 
-namespace LauncherBridge;
+namespace SteamLauncherManager;
 
 public interface IProcessProvider
 {
@@ -9,6 +9,7 @@ public interface IProcessProvider
     bool Launch(string commandOrUri);
     int GetRunningInstanceCount(string processName);
     void CloseLauncherProcesses(string launchCommand);
+    void KillOverlayProcesses();
 }
 
 public class DefaultProcessProvider : IProcessProvider
@@ -190,6 +191,57 @@ public class DefaultProcessProvider : IProcessProvider
         }
     }
 
+    private static readonly string[] OverlayProcessPrefixes = new[]
+    {
+        "EOSOverlayRenderer"
+    };
+
+    private readonly HashSet<int> _terminatedOverlayPids = new();
+
+    public void KillOverlayProcesses()
+    {
+        try
+        {
+            var processes = Process.GetProcesses();
+            foreach (var p in processes)
+            {
+                try
+                {
+                    string pName = p.ProcessName;
+                    if (OverlayProcessPrefixes.Any(prefix => pName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        if (_terminatedOverlayPids.Add(p.Id))
+                        {
+                            _logger.LogInfo($"Disabling overlay process: '{pName}' (PID: {p.Id})...");
+                        }
+                        try
+                        {
+                            p.Kill(entireProcessTree: true);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogDebug($"Could not kill overlay process '{pName}' (PID: {p.Id}): {ex.Message}");
+                        }
+
+                        ForceKillProcessTreeWindows(pName);
+                    }
+                }
+                catch
+                {
+                    // Ignore individual process errors
+                }
+                finally
+                {
+                    p.Dispose();
+                }
+            }
+        }
+        catch
+        {
+            // Ignore process enum errors
+        }
+    }
+
     private void ForceKillProcessTreeWindows(string procName)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -299,7 +351,7 @@ public class ProcessTracker
             return 1;
         }
 
-        // 4. Close launcher if --close-launcher flag is enabled OR if launcher was newly started by LauncherBridge
+        // 4. Close launcher if --close-launcher flag is enabled OR if launcher was newly started by SteamLauncherManager
         bool wasLauncherRunningInitially = CheckIfLauncherWasRunningInitially(initialSnapshot, options.LaunchCommand);
         if (options.CloseLauncher || !wasLauncherRunningInitially)
         {
@@ -313,7 +365,7 @@ public class ProcessTracker
             _provider.CloseLauncherProcesses(options.LaunchCommand);
         }
 
-        _logger.LogInfo("Game session ended. LauncherBridge exiting with code 0.");
+        _logger.LogInfo("Game session ended. Steam Launcher Manager exiting with code 0.");
         return 0;
     }
 
@@ -325,9 +377,15 @@ public class ProcessTracker
 
         var trackedGamePids = new HashSet<int>();
         string? primaryProcessName = options.ProcessName;
+        bool hasGameStarted = false;
 
         while (!cancellationToken.IsCancellationRequested)
         {
+            if (options.DisableOverlay)
+            {
+                _provider.KillOverlayProcesses();
+            }
+
             var currentSnapshot = _provider.CaptureSnapshot();
             var newProcesses = initialSnapshot.GetNewProcesses(currentSnapshot);
 
@@ -352,16 +410,28 @@ public class ProcessTracker
             }
 
             // Waiting for initial game process to start
-            if (trackedGamePids.Count == 0)
+            if (!hasGameStarted)
             {
-                if (DateTime.UtcNow - startTime > timeoutSpan)
+                if (trackedGamePids.Count > 0)
                 {
-                    return false;
+                    hasGameStarted = true;
                 }
+                else if (!string.IsNullOrEmpty(options.ProcessName) && _provider.GetRunningInstanceCount(options.ProcessName) > 0)
+                {
+                    _logger.LogInfo($"Detected running instance of explicit process: '{options.ProcessName}'");
+                    hasGameStarted = true;
+                }
+                else
+                {
+                    if (DateTime.UtcNow - startTime > timeoutSpan)
+                    {
+                        return false;
+                    }
 
-                _logger.LogDebug("Waiting for game process to start...");
-                await Task.Delay(500, cancellationToken);
-                continue;
+                    _logger.LogDebug("Waiting for game process to start...");
+                    await Task.Delay(500, cancellationToken);
+                    continue;
+                }
             }
 
             // Count how many tracked game processes are currently active
@@ -406,6 +476,15 @@ public class ProcessTracker
                     if (trackedGamePids.Contains(p.Id) || (primaryProcessName != null && p.ProcessName.Equals(primaryProcessName, StringComparison.OrdinalIgnoreCase)))
                     {
                         recheckActiveCount++;
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(primaryProcessName))
+                {
+                    int nameCount = _provider.GetRunningInstanceCount(primaryProcessName);
+                    if (nameCount > recheckActiveCount)
+                    {
+                        recheckActiveCount = nameCount;
                     }
                 }
 

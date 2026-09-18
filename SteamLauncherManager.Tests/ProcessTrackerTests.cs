@@ -1,29 +1,45 @@
-using LauncherBridge;
+using SteamLauncherManager;
 using Xunit;
 
-namespace LauncherBridge.Tests;
+namespace SteamLauncherManager.Tests;
 
 public class MockProcessProvider : IProcessProvider
 {
     public List<ProcessSnapshot> SnapshotsToReturn { get; set; } = new();
     public Dictionary<string, int> InstanceCounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
     public bool LaunchResult { get; set; } = true;
-    public string? LastLaunchedCommand { get; set; private get; }
+    public string? LastLaunchedCommand { get; private set; }
     public bool CloseLauncherCalled { get; set; }
     public string? CloseLauncherCommandPassed { get; set; }
+    public bool KillOverlayCalled { get; set; }
 
     private int _snapshotIndex = 0;
 
     public ProcessSnapshot CaptureSnapshot()
     {
-        if (SnapshotsToReturn.Count == 0)
+        if (SnapshotsToReturn.Count > 0)
         {
-            return new ProcessSnapshot(Array.Empty<ProcessInfo>());
+            var snapshot = SnapshotsToReturn[Math.Min(_snapshotIndex, SnapshotsToReturn.Count - 1)];
+            _snapshotIndex++;
+
+            var filtered = snapshot.Processes
+                .Where(kvp => !InstanceCounts.TryGetValue(kvp.Value, out var count) || count > 0)
+                .Select(kvp => new ProcessInfo(kvp.Key, kvp.Value))
+                .ToList();
+
+            return new ProcessSnapshot(filtered);
         }
 
-        var snapshot = SnapshotsToReturn[Math.Min(_snapshotIndex, SnapshotsToReturn.Count - 1)];
-        _snapshotIndex++;
-        return snapshot;
+        int pid = 100;
+        var procs = new List<ProcessInfo>();
+        foreach (var (name, count) in InstanceCounts)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                procs.Add(new ProcessInfo(pid++, name));
+            }
+        }
+        return new ProcessSnapshot(procs);
     }
 
     public bool Launch(string commandOrUri)
@@ -45,6 +61,11 @@ public class MockProcessProvider : IProcessProvider
     {
         CloseLauncherCalled = true;
         CloseLauncherCommandPassed = launchCommand;
+    }
+
+    public void KillOverlayProcesses()
+    {
+        KillOverlayCalled = true;
     }
 }
 
@@ -200,7 +221,7 @@ public class ProcessTrackerTests
 
         int exitCode = await trackerTask;
 
-        // LauncherBridge must succeed when AlanWake2 exits, even if EpicOnlineServicesHost is still running
+        // Steam Launcher Manager must succeed when AlanWake2 exits, even if EpicOnlineServicesHost is still running
         Assert.Equal(0, exitCode);
     }
 
@@ -292,6 +313,32 @@ public class ProcessTrackerTests
         int exitCode = await trackerTask;
 
         Assert.Equal(0, exitCode);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithDisableOverlay_CallsKillOverlayProcesses()
+    {
+        var provider = new MockProcessProvider();
+        provider.InstanceCounts["AlanWake2"] = 1;
+
+        var tracker = new ProcessTracker(provider, _logger);
+        var options = new Options
+        {
+            LaunchCommand = "com.epicgames.launcher://apps/Item?action=launch",
+            ProcessName = "AlanWake2",
+            DisableOverlay = true,
+            SyncDelaySeconds = 0,
+            TimeoutSeconds = 5
+        };
+
+        var trackerTask = tracker.RunAsync(options);
+        await Task.Delay(600);
+        provider.InstanceCounts["AlanWake2"] = 0;
+
+        int exitCode = await trackerTask;
+
+        Assert.Equal(0, exitCode);
+        Assert.True(provider.KillOverlayCalled);
     }
 }
 

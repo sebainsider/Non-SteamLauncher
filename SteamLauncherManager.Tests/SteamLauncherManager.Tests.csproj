@@ -17,7 +17,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\LauncherBridge\LauncherBridge.csproj" />
+    <ProjectReference Include="..\SteamLauncherManager\SteamLauncherManager.csproj" />
   </ItemGroup>
 
 </Project>

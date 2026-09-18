@@ -1,7 +1,7 @@
-using LauncherBridge;
+using SteamLauncherManager;
 using Xunit;
 
-namespace LauncherBridge.Tests;
+namespace SteamLauncherManager.Tests;
 
 public class OptionsTests
 {
@@ -119,6 +119,21 @@ public class OptionsTests
         Assert.Null(errorShort);
         Assert.NotNull(optionsShort);
         Assert.Equal(8, optionsShort.SyncDelaySeconds);
+    }
+
+    [Theory]
+    [InlineData("--disable-overlay")]
+    [InlineData("-o")]
+    [InlineData("--kill-overlay")]
+    [InlineData("--no-overlay")]
+    public void Parse_WithDisableOverlayFlags_SetsDisableOverlayProperty(string flag)
+    {
+        var args = new[] { "--launch", "com.epicgames.launcher://apps/Item", flag };
+        var (options, error) = Options.Parse(args);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.DisableOverlay);
     }
 }
 

@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace LauncherBridge;
+namespace SteamLauncherManager;
 
 public record ProcessInfo(int Id, string ProcessName);
 

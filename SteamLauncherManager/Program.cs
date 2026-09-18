@@ -1,4 +1,4 @@
-namespace LauncherBridge;
+namespace SteamLauncherManager;
 
 public static class Program
 {
@@ -7,7 +7,7 @@ public static class Program
         var (options, errorMessage) = Options.Parse(args);
         var logger = new Logger(options?.Verbose ?? true);
 
-        logger.LogInfo("=== LauncherBridge Session Starting ===");
+        logger.LogInfo("=== Steam Launcher Manager Session Starting ===");
         logger.LogInfo($"Log file: {logger.LogFilePath}");
         logger.LogInfo($"Arguments: {string.Join(" ", args.Select(a => $"\"{a}\""))}");
 
@@ -33,7 +33,7 @@ public static class Program
         {
             logger.LogInfo($"Explicit Process Name: {options.ProcessName}");
         }
-        logger.LogInfo($"Timeout: {options.TimeoutSeconds}s | Sync Delay: {options.SyncDelaySeconds}s | Close Launcher: {options.CloseLauncher}");
+        logger.LogInfo($"Timeout: {options.TimeoutSeconds}s | Sync Delay: {options.SyncDelaySeconds}s | Close Launcher: {options.CloseLauncher} | Disable Overlay: {options.DisableOverlay}");
 
         var provider = new DefaultProcessProvider(logger);
         var tracker = new ProcessTracker(provider, logger);
@@ -41,7 +41,7 @@ public static class Program
         try
         {
             int result = await tracker.RunAsync(options);
-            logger.LogInfo($"LauncherBridge finished with exit code {result}");
+            logger.LogInfo($"Steam Launcher Manager finished with exit code {result}");
             return result;
         }
         catch (Exception ex)
