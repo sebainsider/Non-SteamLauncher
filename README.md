@@ -137,11 +137,7 @@ dotnet publish NonSteamLauncher/NonSteamLauncher.csproj \
 ```
 
 The published executable will be generated at:
-<<<<<<< HEAD
-`SteamLauncherManager/bin/Release/net9.0/win-x64/publish/NonSteamLauncher.exe`
-=======
 `NonSteamLauncher/bin/Release/net9.0/win-x64/publish/NonSteamLauncher.exe`
->>>>>>> 55f1879 (Rename project to Non-Steam Launcher (NonSteamLauncher))
 
 ---
 
