@@ -8,6 +8,11 @@ public class Options
     public int SyncDelaySeconds { get; set; } = 5;
     public bool CloseLauncher { get; set; }
     public bool DisableOverlay { get; set; }
+    public bool SyncSteam { get; set; }
+    public bool ListGames { get; set; }
+    public string? SteamPath { get; set; }
+    public bool DryRun { get; set; }
+    public bool Silent { get; set; }
     public bool Verbose { get; set; }
     public bool ShowHelp { get; set; }
 
@@ -17,7 +22,8 @@ public class Options
 
         if (args.Length == 0)
         {
-            options.ShowHelp = true;
+            // Double-click / No arguments: execute Steam library sync by default
+            options.SyncSteam = true;
             return (options, null);
         }
 
@@ -53,6 +59,40 @@ public class Options
                 arg.Equals("--no-overlay", StringComparison.OrdinalIgnoreCase))
             {
                 options.DisableOverlay = true;
+                continue;
+            }
+
+            if (arg.Equals("--sync-steam", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--sync", StringComparison.OrdinalIgnoreCase))
+            {
+                options.SyncSteam = true;
+                continue;
+            }
+
+            if (arg.Equals("--list-games", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--scan", StringComparison.OrdinalIgnoreCase))
+            {
+                options.ListGames = true;
+                continue;
+            }
+
+            if (arg.Equals("--dry-run", StringComparison.OrdinalIgnoreCase))
+            {
+                options.DryRun = true;
+                continue;
+            }
+
+            if (arg.Equals("--silent", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--quiet", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("-q", StringComparison.OrdinalIgnoreCase))
+            {
+                options.Silent = true;
+                continue;
+            }
+
+            if (TryParseOption(arg, "--steam-path", "--steam", args, ref i, out var steamPathValue))
+            {
+                options.SteamPath = steamPathValue;
                 continue;
             }
 
@@ -110,9 +150,9 @@ public class Options
             return (null, $"Unrecognized argument: '{arg}'");
         }
 
-        if (!options.ShowHelp && string.IsNullOrWhiteSpace(options.LaunchCommand))
+        if (!options.ShowHelp && !options.SyncSteam && !options.ListGames && string.IsNullOrWhiteSpace(options.LaunchCommand))
         {
-            return (null, "Missing required argument: --launch <command or URI>");
+            return (null, "Missing required argument: --launch <command or URI>, or specify --sync-steam / --list-games");
         }
 
         return (options, null);
@@ -151,13 +191,16 @@ public class Options
 
     public static void PrintHelp()
     {
-        Console.WriteLine("Non-Steam Launcher - Steam Third-Party Launcher Monitor (.NET 9)");
+        Console.WriteLine("Non-Steam Launcher - Steam Third-Party Launcher Monitor & Library Sync (.NET 9)");
         Console.WriteLine();
         Console.WriteLine("Usage:");
+        Console.WriteLine("  NonSteamLauncher                             (Default / Double-click: Syncs games with Steam)");
         Console.WriteLine("  NonSteamLauncher --launch <command or URI> [options]");
+        Console.WriteLine("  NonSteamLauncher --sync-steam [options]");
+        Console.WriteLine("  NonSteamLauncher --list-games [options]");
         Console.WriteLine();
-        Console.WriteLine("Options:");
-        Console.WriteLine("  --launch, -l <command/URI>       (Required) Command line or URI to launch the game.");
+        Console.WriteLine("Launch & Tracking Options:");
+        Console.WriteLine("  --launch, -l <command/URI>       Command line or URI to launch the game.");
         Console.WriteLine("  --process, -p <name>             (Optional) Specific process name to monitor (without .exe).");
         Console.WriteLine("                                   If omitted, automatically detects new processes started after launch.");
         Console.WriteLine("  --timeout, -t <seconds>          (Optional) Maximum time to wait for the target process to start.");
@@ -167,13 +210,31 @@ public class Options
         Console.WriteLine("  --close-launcher, -c             (Optional) Close/terminate third-party launcher processes after game exits.");
         Console.WriteLine("  --disable-overlay, -o            (Optional) Terminate launcher overlay processes (e.g. EOSOverlayRenderer)");
         Console.WriteLine("                                   to suppress in-game popups and notifications.");
+        Console.WriteLine();
+        Console.WriteLine("Couch Gaming & Steam Library Sync:");
+        Console.WriteLine("  --sync-steam, --sync             Automatically scan installed games across launchers (Epic, EA,");
+        Console.WriteLine("                                   Ubisoft, Battle.net, GOG) and add them to Steam shortcuts.vdf.");
+        Console.WriteLine("  --list-games, --scan             Scan and display installed games across launchers without modifying Steam.");
+        Console.WriteLine("  --silent, -q                     (Optional) Suppress the sync status dialog window (silent mode).");
+        Console.WriteLine("  --steam-path <path>              (Optional) Override Steam installation directory path.");
+        Console.WriteLine("  --dry-run                        (Optional) Simulate Steam sync without writing shortcuts to disk.");
+        Console.WriteLine();
+        Console.WriteLine("General Options:");
         Console.WriteLine("  --verbose, -v                    (Optional) Enable verbose debug logging.");
         Console.WriteLine("  --help, -h                       Display this help message.");
         Console.WriteLine();
         Console.WriteLine("Examples:");
+        Console.WriteLine("  # Double-click or run directly to sync:");
+        Console.WriteLine("  NonSteamLauncher");
+        Console.WriteLine();
+        Console.WriteLine("  # Silent background sync:");
+        Console.WriteLine("  NonSteamLauncher --sync-steam --silent");
+        Console.WriteLine();
+        Console.WriteLine("  # Preview detected games across launchers:");
+        Console.WriteLine("  NonSteamLauncher --list-games");
+        Console.WriteLine();
+        Console.WriteLine("  # Manual game launch via URI:");
         Console.WriteLine("  NonSteamLauncher --launch \"com.epicgames.launcher://apps/Item?action=launch\" --close-launcher --disable-overlay");
-        Console.WriteLine("  NonSteamLauncher --launch \"steam://run/123456\" --process \"MyGame\"");
-        Console.WriteLine("  NonSteamLauncher --launch \"C:\\Games\\Launcher.exe\" --timeout 90 -c -s 7 -o");
     }
 }
 

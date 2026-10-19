@@ -6,13 +6,42 @@ namespace NonSteamLauncher.Tests;
 public class OptionsTests
 {
     [Fact]
-    public void Parse_WithNoArgs_ShowsHelp()
+    public void Parse_WithNoArgs_DefaultsToSyncSteam()
     {
         var (options, error) = Options.Parse(Array.Empty<string>());
 
         Assert.Null(error);
         Assert.NotNull(options);
+        Assert.True(options.SyncSteam);
+        Assert.False(options.Silent);
+        Assert.False(options.ShowHelp);
+    }
+
+    [Theory]
+    [InlineData("--help")]
+    [InlineData("-h")]
+    [InlineData("/?")]
+    public void Parse_WithHelpFlag_ShowsHelp(string flag)
+    {
+        var (options, error) = Options.Parse(new[] { flag });
+
+        Assert.Null(error);
+        Assert.NotNull(options);
         Assert.True(options.ShowHelp);
+    }
+
+    [Theory]
+    [InlineData("--silent")]
+    [InlineData("--quiet")]
+    [InlineData("-q")]
+    public void Parse_WithSilentFlags_SetsSilentProperty(string flag)
+    {
+        var (options, error) = Options.Parse(new[] { flag });
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.Silent);
+        Assert.True(options.SyncSteam);
     }
 
     [Fact]
@@ -134,6 +163,45 @@ public class OptionsTests
         Assert.Null(error);
         Assert.NotNull(options);
         Assert.True(options.DisableOverlay);
+    }
+
+    [Theory]
+    [InlineData("--sync-steam")]
+    [InlineData("--sync")]
+    public void Parse_WithSyncSteam_DoesNotRequireLaunchCommand(string flag)
+    {
+        var args = new[] { flag };
+        var (options, error) = Options.Parse(args);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.SyncSteam);
+    }
+
+    [Theory]
+    [InlineData("--list-games")]
+    [InlineData("--scan")]
+    public void Parse_WithListGames_DoesNotRequireLaunchCommand(string flag)
+    {
+        var args = new[] { flag };
+        var (options, error) = Options.Parse(args);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.ListGames);
+    }
+
+    [Fact]
+    public void Parse_WithSteamPathAndDryRun_ParsesCorrectly()
+    {
+        var args = new[] { "--sync-steam", "--steam-path", "C:\\CustomSteam", "--dry-run" };
+        var (options, error) = Options.Parse(args);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.SyncSteam);
+        Assert.Equal("C:\\CustomSteam", options.SteamPath);
+        Assert.True(options.DryRun);
     }
 }
 

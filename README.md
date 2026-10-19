@@ -2,10 +2,33 @@
 
 <p align="center">
   <img src="NonSteamLauncher/icon.png" width="128" alt="Non-Steam Launcher Icon" /><br>
-  <strong>v1.5.3</strong>
+  <strong>v1.6.0</strong>
 </p>
 
 **Non-Steam Launcher** (official project name: **Non-SteamLauncher**) is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
+
+---
+
+## 🛋️ Couch Gaming: 1-Click Steam Library Sync
+
+Sit back on the couch with your controller! You no longer need to find obscure launcher URIs, copy GUIDs, or manually configure Steam non-Steam shortcuts:
+
+Simply **double-click `NonSteamLauncher.exe`** directly from Windows Explorer or your desktop:
+
+```cmd
+# Simply run with no arguments (or double-click the .exe):
+NonSteamLauncher.exe
+```
+
+**What it does automatically:**
+1. **Scans** all installed games across **Epic Games Store, EA App, Ubisoft Connect, Battle.net, and GOG Galaxy**.
+2. **Generates** the exact launch URI and options (`--close-launcher`, `--disable-overlay`).
+3. **Injects** the shortcuts directly into Steam's `shortcuts.vdf` (safely backing up the file first).
+4. **Preserves** all your existing Steam shortcuts and tags them with their launcher.
+5. **Aesthetic Dialog**: Displays a clean, dark-themed summary dialog with platform badges, automatic multi-language support (matches Windows system language), and a Steam-styled action button with dynamic controller glyphs (e.g. `[ Ⓑ Close ]` on Xbox / `[ ○ Close ]` on PlayStation / `[ [Esc] Close ]` on keyboard)!
+
+> 💡 *Need silent execution for background tasks or scheduled scripts? Add `--silent` (e.g. `NonSteamLauncher.exe --silent`).*
+> 💡 *Want to preview installed games in the terminal without modifying Steam? Run `NonSteamLauncher.exe --list-games`.*
 
 ---
 
@@ -26,20 +49,37 @@ Non-Steam Launcher automates process detection with zero configuration required 
 
 ## ⚡ Quick Start & Usage
 
-### Basic Usage (Auto-Detection)
+### 1. Couch Gaming (Default Sync)
+```cmd
+# Double-click NonSteamLauncher.exe or run with no arguments:
+NonSteamLauncher.exe
+
+# Background silent sync (no popup window):
+NonSteamLauncher.exe --silent
+
+# Preview games found on your system in terminal:
+NonSteamLauncher.exe --list-games
+```
+
+### 2. Manual Game Launch (Auto-Detection)
 ```cmd
 NonSteamLauncher.exe "com.epicgames.launcher://apps/Item?action=launch"
 ```
 *(You can also explicitly pass `--launch` / `-l`)*:
 ```cmd
-NonSteamLauncher.exe --launch "com.epicgames.launcher://apps/Item?action=launch" --close-launcher
+NonSteamLauncher.exe --launch "com.epicgames.launcher://apps/Item?action=launch" --close-launcher --disable-overlay
 ```
 
 ### Options & Parameters
 
 | Parameter | Short / Aliases | Required | Description | Default |
 |---|---|---|---|---|
-| `--launch` | `-l` | **Yes*** | Launcher URI, command line, or executable path to launch (*can also be passed directly as 1st positional argument) | N/A |
+| `--sync-steam` | `--sync` | No | Automatically scan installed games and sync them to Steam's `shortcuts.vdf` (*default on double-click*) | N/A |
+| `--list-games` | `--scan` | No | Scan and list installed games across launchers without writing to Steam | N/A |
+| `--silent` | `-q`, `--quiet` | No | Suppress the aesthetic sync completion popup window | `false` |
+| `--steam-path` | `--steam` | No | (Optional) Custom Steam installation directory for `--sync-steam` | Auto-detect |
+| `--dry-run` | | No | (Optional) Simulate Steam sync without writing shortcuts to disk | `false` |
+| `--launch` | `-l` | **Yes*** | Launcher URI, command line, or executable path to launch (*when not syncing/listing) | N/A |
 | `--process` | `-p` | No | Explicit process name (without `.exe`) to monitor. Override auto-detection if needed | Auto-detect |
 | `--timeout` | `-t` | No | Maximum time in seconds to wait for the target game process to start | `60` |
 | `--sync-delay` | `-s`, `-d`, `--delay` | No | Delay in seconds after game exits before closing the launcher, allowing cloud saves to sync | `5` |
