@@ -11,6 +11,9 @@ public class Options
     public bool SyncSteam { get; set; }
     public bool ListGames { get; set; }
     public string? SteamPath { get; set; }
+    public string? SteamGridDbApiKey { get; set; }
+    public bool SkipArtwork { get; set; }
+    public string? SettingsFilePath { get; set; }
     public bool DryRun { get; set; }
     public bool Silent { get; set; }
     public bool Verbose { get; set; }
@@ -82,9 +85,18 @@ public class Options
                 continue;
             }
 
+            if (arg.Equals("--no-artwork", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--no-images", StringComparison.OrdinalIgnoreCase))
+            {
+                options.SkipArtwork = true;
+                continue;
+            }
+
             if (arg.Equals("--silent", StringComparison.OrdinalIgnoreCase) ||
                 arg.Equals("--quiet", StringComparison.OrdinalIgnoreCase) ||
-                arg.Equals("-q", StringComparison.OrdinalIgnoreCase))
+                arg.Equals("-q", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--no-ui", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--headless", StringComparison.OrdinalIgnoreCase))
             {
                 options.Silent = true;
                 continue;
@@ -93,6 +105,19 @@ public class Options
             if (TryParseOption(arg, "--steam-path", "--steam", args, ref i, out var steamPathValue))
             {
                 options.SteamPath = steamPathValue;
+                continue;
+            }
+
+            if (TryParseOption(arg, "--sgdb-key", "--steamgriddb-key", args, ref i, out var sgdbKeyValue) ||
+                TryParseOption(arg, "--api-key", "-k", args, ref i, out sgdbKeyValue))
+            {
+                options.SteamGridDbApiKey = sgdbKeyValue;
+                continue;
+            }
+
+            if (TryParseOption(arg, "--settings", "--config", args, ref i, out var settingsFileValue))
+            {
+                options.SettingsFilePath = settingsFileValue;
                 continue;
             }
 
@@ -152,7 +177,14 @@ public class Options
 
         if (!options.ShowHelp && !options.SyncSteam && !options.ListGames && string.IsNullOrWhiteSpace(options.LaunchCommand))
         {
-            return (null, "Missing required argument: --launch <command or URI>, or specify --sync-steam / --list-games");
+            if (options.Silent || options.DryRun || !string.IsNullOrEmpty(options.SteamGridDbApiKey))
+            {
+                options.SyncSteam = true;
+            }
+            else
+            {
+                return (null, "Missing required argument: --launch <command or URI>, or specify --sync-steam / --list-games");
+            }
         }
 
         return (options, null);
@@ -215,6 +247,9 @@ public class Options
         Console.WriteLine("  --sync-steam, --sync             Automatically scan installed games across launchers (Epic, EA,");
         Console.WriteLine("                                   Ubisoft, Battle.net, GOG) and add them to Steam shortcuts.vdf.");
         Console.WriteLine("  --list-games, --scan             Scan and display installed games across launchers without modifying Steam.");
+        Console.WriteLine("  --sgdb-key, -k <key>             (Optional) Save and use a SteamGridDB API Key for automatic artwork & icons.");
+        Console.WriteLine("  --no-artwork                     (Optional) Skip downloading covers, heroes, logos, and icons during sync.");
+        Console.WriteLine("  --settings <path>                (Optional) Custom path to settings.json file.");
         Console.WriteLine("  --silent, -q                     (Optional) Suppress the sync status dialog window (silent mode).");
         Console.WriteLine("  --steam-path <path>              (Optional) Override Steam installation directory path.");
         Console.WriteLine("  --dry-run                        (Optional) Simulate Steam sync without writing shortcuts to disk.");
@@ -227,6 +262,9 @@ public class Options
         Console.WriteLine("  # Double-click or run directly to sync:");
         Console.WriteLine("  NonSteamLauncher");
         Console.WriteLine();
+        Console.WriteLine("  # Configure SteamGridDB API Key and sync with artwork:");
+        Console.WriteLine("  NonSteamLauncher --sgdb-key \"YOUR_STEAMGRIDDB_API_KEY\"");
+        Console.WriteLine();
         Console.WriteLine("  # Silent background sync:");
         Console.WriteLine("  NonSteamLauncher --sync-steam --silent");
         Console.WriteLine();
@@ -237,5 +275,3 @@ public class Options
         Console.WriteLine("  NonSteamLauncher --launch \"com.epicgames.launcher://apps/Item?action=launch\" --close-launcher --disable-overlay");
     }
 }
-
-

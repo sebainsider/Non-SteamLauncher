@@ -59,6 +59,27 @@ public static class GamepadDetector
     [DllImport("xinput9_1_0.dll", EntryPoint = "XInputGetState")]
     private static extern uint XInputGetState910(uint dwUserIndex, out XINPUT_STATE pState);
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct JOYINFOEX
+    {
+        public uint dwSize;
+        public uint dwFlags;
+        public uint dwXpos;
+        public uint dwYpos;
+        public uint dwZpos;
+        public uint dwRpos;
+        public uint dwUpos;
+        public uint dwVpos;
+        public uint dwButtons;
+        public uint dwButtonNumber;
+        public uint dwPOV;
+        public uint dwReserved1;
+        public uint dwReserved2;
+    }
+
+    [DllImport("winmm.dll")]
+    private static extern uint joyGetPosEx(uint uJoyID, ref JOYINFOEX pji);
+
     public static GamepadType DetectConnectedGamepad()
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -66,7 +87,54 @@ public static class GamepadDetector
 
         try
         {
-            // 1. Check RawInput HID devices for Sony (0x054C) or Nintendo (0x057E)
+            bool hasActiveXInput = false;
+            for (uint i = 0; i < 4; i++)
+            {
+                uint err;
+                try
+                {
+                    err = XInputGetState14(i, out _);
+                }
+                catch (DllNotFoundException)
+                {
+                    try { err = XInputGetState910(i, out _); }
+                    catch { break; }
+                }
+                catch { break; }
+
+                if (err == 0) // ERROR_SUCCESS
+                {
+                    hasActiveXInput = true;
+                    break;
+                }
+            }
+
+            bool hasActiveWinMm = false;
+            if (!hasActiveXInput)
+            {
+                for (uint j = 0; j < 4; j++)
+                {
+                    try
+                    {
+                        var ji = new JOYINFOEX
+                        {
+                            dwSize = (uint)Marshal.SizeOf<JOYINFOEX>(),
+                            dwFlags = 0xFF
+                        };
+                        if (joyGetPosEx(j, ref ji) == 0)
+                        {
+                            hasActiveWinMm = true;
+                            break;
+                        }
+                    }
+                    catch { break; }
+                }
+            }
+
+            if (!hasActiveXInput && !hasActiveWinMm)
+                return GamepadType.Keyboard;
+
+            // Check RawInput HID devices for Sony (0x054C) or Nintendo (0x057E / 0x20D6)
             uint deviceCount = 0;
             uint structSize = (uint)Marshal.SizeOf<RAWINPUTDEVICELIST>();
 
@@ -94,7 +162,8 @@ public static class GamepadDetector
                                             if (devName.Contains("vid_054c", StringComparison.OrdinalIgnoreCase))
                                                 return GamepadType.PlayStation;
 
-                                            if (devName.Contains("vid_057e", StringComparison.OrdinalIgnoreCase))
+                                            if (devName.Contains("vid_057e", StringComparison.OrdinalIgnoreCase) ||
+                                                devName.Contains("vid_20d6", StringComparison.OrdinalIgnoreCase))
                                                 return GamepadType.Nintendo;
                                         }
                                     }
@@ -109,26 +178,7 @@ public static class GamepadDetector
                 }
             }
 
-            // 2. Check XInput (Xbox & generic XInput gamepads)
-            for (uint i = 0; i < 4; i++)
-            {
-                uint err;
-                try
-                {
-                    err = XInputGetState14(i, out _);
-                }
-                catch (DllNotFoundException)
-                {
-                    try { err = XInputGetState910(i, out _); }
-                    catch { break; }
-                }
-                catch { break; }
-
-                if (err == 0) // ERROR_SUCCESS
-                {
-                    return GamepadType.Xbox;
-                }
-            }
+            return GamepadType.Xbox;
         }
         catch
         {

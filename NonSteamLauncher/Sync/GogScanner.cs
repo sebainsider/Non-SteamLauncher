@@ -34,6 +34,12 @@ public class GogScanner : IScanner
                     continue;
 
                 string fullKey = $"{basePath}\\{gameId}";
+
+                // Skip DLC entries that depend on a base game
+                string? dependsOn = _registry.GetValue(fullKey, "dependsOn");
+                if (!string.IsNullOrWhiteSpace(dependsOn))
+                    continue;
+
                 string? gameName = _registry.GetValue(fullKey, "gameName");
                 string? exe = _registry.GetValue(fullKey, "exe");
                 string? path = _registry.GetValue(fullKey, "path");

@@ -90,7 +90,7 @@ public class GameDetector
             .ToList();
     }
 
-    private static string NormalizeTitle(string title)
+    public static string NormalizeTitle(string title)
     {
         if (string.IsNullOrWhiteSpace(title))
             return string.Empty;

@@ -203,6 +203,18 @@ public class OptionsTests
         Assert.Equal("C:\\CustomSteam", options.SteamPath);
         Assert.True(options.DryRun);
     }
+
+    [Fact]
+    public void Parse_WithSgdbKeyAndNoArtwork_ParsesCorrectly()
+    {
+        var args = new[] { "--sgdb-key", "abc123key", "--no-artwork", "--settings", "C:\\custom\\settings.json" };
+        var (options, error) = Options.Parse(args);
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.SyncSteam);
+        Assert.Equal("abc123key", options.SteamGridDbApiKey);
+        Assert.True(options.SkipArtwork);
+        Assert.Equal("C:\\custom\\settings.json", options.SettingsFilePath);
+    }
 }
-
-

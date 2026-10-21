@@ -1,34 +1,4 @@
-Non-Steam Launcher — Colección / versión aprobada
-
-Diseño: cubierta azul, lomo grafito, segunda cubierta cian, controles blancos
-centrados verticalmente y sombra gris. Conserva la composición aprobada.
-
-ARCHIVOS
-Non-Steam-Launcher.svg: original vectorial editable, retícula 48 × 48,
-salida predeterminada 1024 × 1024. Capas identificadas y sombra editable.
-No utiliza imágenes incrustadas, fuentes ni dependencias externas.
-
-Non-Steam-Launcher.ico: 15 imágenes de 32 bits RGBA a
-16, 20, 24, 30, 32, 36, 40, 48, 60, 64, 72, 80, 96, 128 y 256 px.
-Cada resolución está almacenada con compresión PNG dentro del ICO.
-
-PNG RGBA a todas las resoluciones anteriores más 512 y 1024 px.
-Revision-claro-oscuro.png: inspección a tamaño nativo y ampliado 3×.
-Verificacion.json: comprobaciones automáticas.
-SHA256SUMS.txt: integridad de archivos.
-
-USO
-Para un ejecutable o acceso directo de Windows, usar el ICO.
-Para documentación, web y diseño, usar SVG o el PNG del tamaño adecuado.
-Las superficies son opacas y el exterior es transparente. Las sombras están
-contenidas dentro de la cubierta. Los PNG se renderizaron directamente desde
-el SVG a cada resolución, sin encadenar reducciones rasterizadas.
-
-VERIFICACIÓN
-Dimensiones, RGBA, margen transparente y opacidad de superficie.
-Lectura independiente de cada resolución del ICO y coincidencia exacta con PNG.
-Inspección visual a 16, 24, 32 y 48 px sobre fondos claro y oscuro.
-A 16 px los controles se perciben como detalles pequeños y el borde cian
-es mínimo. La sombra se aprecia mejor desde 32–48 px.
-No se ha probado integrado en un ejecutable de Windows. No incluye manifiesto
-MSIX ni recursos específicos de Microsoft Store.
+Colección ampliada: escala visual +31%. Silueta 87% ancho y 90% alto.
+SVG, PNG 16–1024 px e ICO de 15 resoluciones.
+Dimensiones, esquinas transparentes, opacidad interior y lectura del ICO verificadas.
+No probado integrado en Windows.

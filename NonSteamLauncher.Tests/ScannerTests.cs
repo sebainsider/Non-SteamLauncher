@@ -191,14 +191,106 @@ public class ScannerTests
         mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\Electronic Arts\EA Games\Unravel Two", "DisplayName", "Unravel Two");
 
         var scanner = new EAAppScanner(mockRegistry);
-        // Note: Scan checks directory existence on disk, which might not exist in virtual test env unless mocked
-        // But we can verify scanner name and registry reading logic
         Assert.Equal("EA App", scanner.ScannerName);
+    }
+
+    [Fact]
+    public void EAAppScanner_ParseInstallerDataXml_ExtractsNonTrialLauncherAndTitle()
+    {
+        string xml = """
+        <?xml version='1.0' encoding='utf-8'?>
+        <DiPManifest version="4.0">
+          <contentIDs>
+            <contentID>1035049</contentID>
+          </contentIDs>
+          <gameTitles>
+            <gameTitle locale="en_US">UNRAVEL™ two</gameTitle>
+          </gameTitles>
+          <runtime>
+            <launcher uid="1-2">
+              <name locale="en_US">UNRAVEL™ two</name>
+              <filePath>[HKEY_LOCAL_MACHINE\SOFTWARE\Coldwood\UnravelTwo\Install Dir]UnravelTwo.exe</filePath>
+              <trial>0</trial>
+            </launcher>
+            <launcher uid="2-2">
+              <name locale="en_US">UNRAVEL™ two Trial</name>
+              <filePath>[HKEY_LOCAL_MACHINE\SOFTWARE\Coldwood\UnravelTwo\Install Dir]UnravelTwo_trial.exe</filePath>
+              <trial>1</trial>
+            </launcher>
+          </runtime>
+        </DiPManifest>
+        """;
+
+        var mockRegistry = new MockRegistryReader();
+        mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\Origin Games\1035049", "DisplayName", "Unravel Two");
+
+        var (title, exePath, contentId) = EAAppScanner.ParseInstallerDataXml(xml, @"C:\Games\UnravelTwo", mockRegistry);
+
+        Assert.Equal("Unravel Two", title);
+        Assert.Equal(@"C:\Games\UnravelTwo\UnravelTwo.exe", exePath);
+        Assert.Equal("1035049", contentId);
+    }
+
+    [Fact]
+    public void EAAppScanner_DiscoversGameViaUninstallRegistryAndManifest()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "EAAppScannerTest_" + Guid.NewGuid().ToString("N"));
+        string gameDir = Path.Combine(tempDir, "UnravelTwo");
+        string installerDir = Path.Combine(gameDir, "__Installer");
+        Directory.CreateDirectory(installerDir);
+
+        try
+        {
+            string exePath = Path.Combine(gameDir, "UnravelTwo.exe");
+            string trialPath = Path.Combine(gameDir, "UnravelTwo_trial.exe");
+            File.WriteAllText(exePath, "main_exe");
+            File.WriteAllText(trialPath, "trial_exe_much_larger_content_1234567890");
+
+            File.WriteAllText(Path.Combine(installerDir, "installerdata.xml"), """
+            <?xml version='1.0' encoding='utf-8'?>
+            <DiPManifest version="4.0">
+              <contentIDs><contentID>1035049</contentID></contentIDs>
+              <gameTitles><gameTitle locale="en_US">UNRAVEL™ two</gameTitle></gameTitles>
+              <runtime>
+                <launcher uid="1-2">
+                  <filePath>[HKEY_LOCAL_MACHINE\SOFTWARE\Coldwood\UnravelTwo\Install Dir]UnravelTwo.exe</filePath>
+                  <trial>0</trial>
+                </launcher>
+                <launcher uid="2-2">
+                  <filePath>[HKEY_LOCAL_MACHINE\SOFTWARE\Coldwood\UnravelTwo\Install Dir]UnravelTwo_trial.exe</filePath>
+                  <trial>1</trial>
+                </launcher>
+              </runtime>
+            </DiPManifest>
+            """);
+
+            var mockRegistry = new MockRegistryReader();
+            mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\Origin Games\1035049", "DisplayName", "Unravel Two");
+            mockRegistry.AddSubKey(@"HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall", "{5DB117FE-6F05-40AC-B7A3-5C67641F14C0}");
+            mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{5DB117FE-6F05-40AC-B7A3-5C67641F14C0}", "DisplayName", "UNRAVEL™ two");
+            mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{5DB117FE-6F05-40AC-B7A3-5C67641F14C0}", "InstallLocation", gameDir);
+            mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{5DB117FE-6F05-40AC-B7A3-5C67641F14C0}", "Publisher", "Electronic Arts, Inc.");
+            mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\{5DB117FE-6F05-40AC-B7A3-5C67641F14C0}", "UninstallString", @"""C:\Program Files\Common Files\EAInstaller\UnravelTwo\Cleanup.exe"" uninstall_game");
+
+            var scanner = new EAAppScanner(mockRegistry, customDirectories: new[] { tempDir });
+            var games = scanner.Scan();
+
+            Assert.Single(games);
+            Assert.Equal("Unravel Two", games[0].Title);
+            Assert.Equal("EA App", games[0].Launcher);
+            Assert.Equal(exePath, games[0].ExecutablePath);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+                Directory.Delete(tempDir, true);
+        }
     }
 
     [Theory]
     [InlineData(@"C:\Program Files\EA Games\Unravel Two\UnravelTwo.exe", null, "EA App")]
     [InlineData(@"D:\Origin Games\Dead Space\DeadSpace.exe", null, "EA App")]
+    [InlineData(@"C:\Program Files\Electronic Arts\EA Desktop\EA Desktop\EALauncher.exe", null, null)]
     [InlineData(@"C:\Program Files (x86)\Ubisoft\Ubisoft Game Launcher\games\Far Cry 6\FarCry6.exe", null, "Ubisoft Connect")]
     [InlineData(@"C:\Games\Epic Games\AlanWake2\AlanWake2.exe", null, "Epic Games")]
     [InlineData(@"C:\GOG Games\Cyberpunk 2077\bin\x64\Cyberpunk2077.exe", null, "GOG Galaxy")]

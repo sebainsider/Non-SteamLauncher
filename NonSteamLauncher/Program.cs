@@ -51,15 +51,24 @@ public static class Program
             return 0;
         }
 
-        // 2. Synchronize installed games into Steam's shortcuts.vdf
+        // 2. Inspect / Synchronize installed games with Steam's shortcuts.vdf
         if (options.SyncSteam)
         {
             var syncService = new Sync.Steam.SteamSyncService(logger: logger);
-            var result = syncService.Sync(options);
+            Sync.Steam.SteamSyncResult result;
 
             if (!options.Silent)
             {
-                Sync.UI.SyncStatusDialog.Show(result);
+                result = syncService.Inspect(options);
+                result = Sync.UI.SyncStatusDialog.Show(
+                    result,
+                    selectedGames => syncService.SyncSelectedGames(options, selectedGames, deferArtwork: true),
+                    () => syncService.SyncArtworkForExistingGames(options),
+                    options.SettingsFilePath);
+            }
+            else
+            {
+                result = syncService.Sync(options);
             }
 
             if (result.Success)
@@ -108,4 +117,3 @@ public static class Program
         }
     }
 }
-
