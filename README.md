@@ -1,4 +1,4 @@
-# Non-Steam Launcher 🚀
+# Non-Steam Launcher
 
 <p align="center">
   <img src="NonSteamLauncher/icon.png" width="128" alt="Non-Steam Launcher Icon" /><br>
