@@ -1054,9 +1054,10 @@ public static class SyncStatusDialog
 
             if (_gamepadType == GamepadType.PlayStation)
             {
-                // PlayStation DualSense / DualShock circular charcoal button with vector geometry
-                uint capFill = ToArgb(Rgb(32, 35, 42));
-                uint capRim = ToArgb(Rgb(92, 98, 114));
+                // PlayStation 5 DualSense pure neutral monochrome gray button cap & geometric symbols
+                uint capFill = ToArgb(Rgb(58, 58, 58));
+                uint capRim = ToArgb(Rgb(148, 148, 148));
+                uint symCol = ToArgb(Rgb(232, 232, 232));
                 DrawSmoothCircle(g, left, top, height, capFill, capRim, Math.Max(1f, Sf(1.2f)));
 
                 float cx = left + height / 2f;
@@ -1066,34 +1067,30 @@ public static class SyncStatusDialog
 
                 switch (glyph)
                 {
-                    case InputGlyph.Confirm: // Cross (✕) - PlayStation Blue
+                    case InputGlyph.Confirm: // Cross (✕) - DualSense Monochrome Gray
                         {
-                            uint col = ToArgb(Rgb(78, 142, 247));
-                            DrawSmoothLine(g, cx - r, cy - r, cx + r, cy + r, col, sw);
-                            DrawSmoothLine(g, cx + r, cy - r, cx - r, cy + r, col, sw);
+                            DrawSmoothLine(g, cx - r, cy - r, cx + r, cy + r, symCol, sw);
+                            DrawSmoothLine(g, cx + r, cy - r, cx - r, cy + r, symCol, sw);
                             break;
                         }
-                    case InputGlyph.Cancel: // Circle (○) - PlayStation Coral Red
+                    case InputGlyph.Cancel: // Circle (○) - DualSense Monochrome Gray
                         {
-                            uint col = ToArgb(Rgb(235, 78, 85));
-                            DrawSmoothCircle(g, cx - r, cy - r, r * 2f, 0, col, sw);
+                            DrawSmoothCircle(g, cx - r, cy - r, r * 2f, 0, symCol, sw);
                             break;
                         }
-                    case InputGlyph.PrimaryAction: // Square (□) - PlayStation Pink
+                    case InputGlyph.PrimaryAction: // Square (□) - DualSense Monochrome Gray
                         {
-                            uint col = ToArgb(Rgb(219, 101, 180));
-                            DrawSmoothRoundedCard(g, cx - r, cy - r, r * 2f, r * 2f, Sf(1.2f), 0, col, sw);
+                            DrawSmoothRoundedCard(g, cx - r, cy - r, r * 2f, r * 2f, Sf(1.2f), 0, symCol, sw);
                             break;
                         }
-                    case InputGlyph.SecondaryAction: // Triangle (△) - PlayStation Mint Green
+                    case InputGlyph.SecondaryAction: // Triangle (△) - DualSense Monochrome Gray
                         {
-                            uint col = ToArgb(Rgb(56, 196, 152));
                             float topY = cy - r * 1.05f;
                             float botY = cy + r * 0.85f;
                             float halfBase = r * 1.05f;
-                            DrawSmoothLine(g, cx, topY, cx + halfBase, botY, col, sw);
-                            DrawSmoothLine(g, cx + halfBase, botY, cx - halfBase, botY, col, sw);
-                            DrawSmoothLine(g, cx - halfBase, botY, cx, topY, col, sw);
+                            DrawSmoothLine(g, cx, topY, cx + halfBase, botY, symCol, sw);
+                            DrawSmoothLine(g, cx + halfBase, botY, cx - halfBase, botY, symCol, sw);
+                            DrawSmoothLine(g, cx - halfBase, botY, cx, topY, symCol, sw);
                             break;
                         }
                 }
@@ -2107,6 +2104,12 @@ public static class SyncStatusDialog
                         int x = (short)(lParam.ToInt64() & 0xFFFF);
                         int y = (short)((lParam.ToInt64() >> 16) & 0xFFFF);
 
+                        if (_gamepadType != GamepadType.Keyboard)
+                        {
+                            _gamepadType = GamepadType.Keyboard;
+                            InvalidateRect(hWnd, IntPtr.Zero, false);
+                        }
+
                         bool hasPrimary = _isSettingsView || GetUnsyncedCount() > 0;
                         if (_btnSettingsRect.Contains(x, y))
                         {
@@ -2742,8 +2745,7 @@ public static class SyncStatusDialog
             // If user interacts with the controller after using the keyboard, switch aesthetics to controller
             if ((buttons != 0 || dirX != 0 || dirY != 0) && _gamepadType == GamepadType.Keyboard)
             {
-                var hwGamepad = GamepadDetector.DetectConnectedGamepad();
-                _gamepadType = hwGamepad != GamepadType.Keyboard ? hwGamepad : GamepadType.Xbox;
+                _gamepadType = GamepadDetector.DetectGamepadFamily();
                 _lastHardwareGamepad = _gamepadType;
                 InvalidateRect(hWnd, IntPtr.Zero, false);
             }

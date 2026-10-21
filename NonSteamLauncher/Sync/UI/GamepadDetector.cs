@@ -80,6 +80,45 @@ public static class GamepadDetector
     [DllImport("winmm.dll")]
     private static extern uint joyGetPosEx(uint uJoyID, ref JOYINFOEX pji);
 
+    public static GamepadType DetectGamepadFamily()
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return GamepadType.Xbox;
+
+        try
+        {
+            uint deviceCount = 0;
+            uint structSize = (uint)Marshal.SizeOf<RAWINPUTDEVICELIST>();
+
+            if (GetRawInputDeviceList(null, ref deviceCount, structSize) == 0 && deviceCount > 0)
+            {
+                var devices = new RAWINPUTDEVICELIST[deviceCount];
+                if (GetRawInputDeviceList(devices, ref deviceCount, structSize) != uint.MaxValue)
+                {
+                    foreach (var dev in devices)
+                    {
+                        if (dev.dwType == 2) // RIM_TYPEHID
+                        {
+                            string? devName = GetDeviceName(dev.hDevice);
+                            if (devName != null)
+                            {
+                                if (devName.Contains("vid_054c", StringComparison.OrdinalIgnoreCase))
+                                    return GamepadType.PlayStation;
+
+                                if (devName.Contains("vid_057e", StringComparison.OrdinalIgnoreCase) ||
+                                    devName.Contains("vid_20d6", StringComparison.OrdinalIgnoreCase))
+                                    return GamepadType.Nintendo;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return GamepadType.Xbox;
+    }
+
     public static GamepadType DetectConnectedGamepad()
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -109,8 +148,56 @@ public static class GamepadDetector
                 }
             }
 
-            bool hasActiveWinMm = false;
-            if (!hasActiveXInput)
+            // Inspect RawInput devices to distinguish standalone controllers from composite keyboards/dongles (e.g. MI_04)
+            bool hasStandalonePlayStation = false;
+            bool hasCompositePlayStationKeyboard = false;
+            bool hasNintendo = false;
+
+            uint deviceCount = 0;
+            uint structSize = (uint)Marshal.SizeOf<RAWINPUTDEVICELIST>();
+
+            if (GetRawInputDeviceList(null, ref deviceCount, structSize) == 0 && deviceCount > 0)
+            {
+                var devices = new RAWINPUTDEVICELIST[deviceCount];
+                if (GetRawInputDeviceList(devices, ref deviceCount, structSize) != uint.MaxValue)
+                {
+                    foreach (var dev in devices)
+                    {
+                        string? devName = GetDeviceName(dev.hDevice);
+                        if (devName == null)
+                            continue;
+
+                        if (dev.dwType == 1 && devName.Contains("vid_054c", StringComparison.OrdinalIgnoreCase))
+                        {
+                            hasCompositePlayStationKeyboard = true;
+                        }
+                        else if (dev.dwType == 2)
+                        {
+                            if (devName.Contains("vid_054c", StringComparison.OrdinalIgnoreCase))
+                                hasStandalonePlayStation = true;
+
+                            if (devName.Contains("vid_057e", StringComparison.OrdinalIgnoreCase) ||
+                                devName.Contains("vid_20d6", StringComparison.OrdinalIgnoreCase))
+                                hasNintendo = true;
+                        }
+                    }
+                }
+            }
+
+            if (hasActiveXInput)
+            {
+                if (hasStandalonePlayStation)
+                    return GamepadType.PlayStation;
+                if (hasNintendo)
+                    return GamepadType.Nintendo;
+                return GamepadType.Xbox;
+            }
+
+            // If there is only a composite keyboard/dongle (MI_04) and no XInput controller, default to Keyboard
+            if (hasCompositePlayStationKeyboard)
+                return GamepadType.Keyboard;
+
+            if (hasStandalonePlayStation || hasNintendo)
             {
                 for (uint j = 0; j < 4; j++)
                 {
@@ -123,62 +210,12 @@ public static class GamepadDetector
                         };
                         if (joyGetPosEx(j, ref ji) == 0)
                         {
-                            hasActiveWinMm = true;
-                            break;
+                            return hasStandalonePlayStation ? GamepadType.PlayStation : GamepadType.Nintendo;
                         }
                     }
                     catch { break; }
                 }
             }
-
-            if (!hasActiveXInput && !hasActiveWinMm)
-                return GamepadType.Keyboard;
-
-            // Check RawInput HID devices for Sony (0x054C) or Nintendo (0x057E / 0x20D6)
-            uint deviceCount = 0;
-            uint structSize = (uint)Marshal.SizeOf<RAWINPUTDEVICELIST>();
-
-            if (GetRawInputDeviceList(null, ref deviceCount, structSize) == 0 && deviceCount > 0)
-            {
-                var devices = new RAWINPUTDEVICELIST[deviceCount];
-                if (GetRawInputDeviceList(devices, ref deviceCount, structSize) != uint.MaxValue)
-                {
-                    foreach (var dev in devices)
-                    {
-                        if (dev.dwType == 2) // RIM_TYPEHID
-                        {
-                            uint nameLen = 0;
-                            GetRawInputDeviceInfo(dev.hDevice, RIDI_DEVICENAME, IntPtr.Zero, ref nameLen);
-                            if (nameLen > 0)
-                            {
-                                IntPtr pName = Marshal.AllocHGlobal((int)(nameLen * 2));
-                                try
-                                {
-                                    if (GetRawInputDeviceInfo(dev.hDevice, RIDI_DEVICENAME, pName, ref nameLen) != uint.MaxValue)
-                                    {
-                                        string? devName = Marshal.PtrToStringAuto(pName);
-                                        if (devName != null)
-                                        {
-                                            if (devName.Contains("vid_054c", StringComparison.OrdinalIgnoreCase))
-                                                return GamepadType.PlayStation;
-
-                                            if (devName.Contains("vid_057e", StringComparison.OrdinalIgnoreCase) ||
-                                                devName.Contains("vid_20d6", StringComparison.OrdinalIgnoreCase))
-                                                return GamepadType.Nintendo;
-                                        }
-                                    }
-                                }
-                                finally
-                                {
-                                    Marshal.FreeHGlobal(pName);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            return GamepadType.Xbox;
         }
         catch
         {
@@ -186,5 +223,27 @@ public static class GamepadDetector
         }
 
         return GamepadType.Keyboard;
+    }
+
+    private static string? GetDeviceName(IntPtr hDevice)
+    {
+        uint nameLen = 0;
+        GetRawInputDeviceInfo(hDevice, RIDI_DEVICENAME, IntPtr.Zero, ref nameLen);
+        if (nameLen == 0)
+            return null;
+
+        IntPtr pName = Marshal.AllocHGlobal((int)(nameLen * 2));
+        try
+        {
+            if (GetRawInputDeviceInfo(hDevice, RIDI_DEVICENAME, pName, ref nameLen) != uint.MaxValue)
+            {
+                return Marshal.PtrToStringAuto(pName);
+            }
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(pName);
+        }
+        return null;
     }
 }
