@@ -27,6 +27,10 @@ public class LauncherFilterTests
     [InlineData("Battle.net")]
     [InlineData("GalaxyClient")]
     [InlineData("steam")]
+    [InlineData("gamelaunchhelper")]
+    [InlineData("gamelaunchhelper.exe")]
+    [InlineData("XboxPcApp")]
+    [InlineData("GamingServices")]
     [InlineData("cmd.exe")]
     [InlineData("powershell")]
     [InlineData("LauncherBridge")]
@@ -47,6 +51,9 @@ public class LauncherFilterTests
     [InlineData("EASportsFC24")]
     [InlineData("DiabloIV.exe")]
     [InlineData("FortniteClient-Win64-Shipping")]
+    [InlineData("ForzaHorizon5")]
+    [InlineData("ForzaHorizon5.exe")]
+    [InlineData("Palworld-WinGDK-Shipping")]
     public void IsLauncherOrSystemProcess_ReturnsFalse_ForGameProcesses(string processName)
     {
         Assert.False(LauncherFilter.IsLauncherOrSystemProcess(processName));

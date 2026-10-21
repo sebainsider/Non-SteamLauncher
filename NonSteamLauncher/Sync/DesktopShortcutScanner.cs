@@ -113,6 +113,10 @@ public class DesktopShortcutScanner : IScanner
         if (uri.StartsWith("goggalaxy://", StringComparison.OrdinalIgnoreCase))
             return "GOG Galaxy";
 
+        if (uri.StartsWith("xbox:", StringComparison.OrdinalIgnoreCase) ||
+            uri.StartsWith("ms-xbl-", StringComparison.OrdinalIgnoreCase))
+            return "Xbox";
+
         return null;
     }
 

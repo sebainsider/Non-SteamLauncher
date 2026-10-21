@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="NonSteamLauncher/icon.png" width="128" alt="Non-Steam Launcher Icon" /><br>
-  <strong>v1.6.0</strong>
+  <strong>v1.7.0</strong>
 </p>
 
 **Non-Steam Launcher** (official project name: **Non-SteamLauncher**) is a lightweight, zero-dependency .NET 9 utility for Windows designed to solve Steam's inability to detect when games launched via third-party launchers (Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, etc.) exit.
@@ -21,7 +21,7 @@ NonSteamLauncher.exe
 ```
 
 **What it does automatically:**
-1. **Scans** all installed games across **Epic Games Store, EA App, Ubisoft Connect, Battle.net, and GOG Galaxy**.
+1. **Scans** all installed games across **Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, and Xbox & PC Game Pass**.
 2. **Generates** the exact launch URI and options (`--close-launcher`, `--disable-overlay`).
 3. **Injects** the shortcuts directly into Steam's `shortcuts.vdf` (safely backing up the file first).
 4. **Preserves** all your existing Steam shortcuts and tags them with their launcher.
@@ -143,6 +143,14 @@ Launch games via Battle.net URIs (`battlenet://`):
 
 - **Target**: `"C:\Tools\NonSteamLauncher.exe"`
 - **Launch Options**: `"battlenet://Fen" --close-launcher`
+
+---
+
+### 5. Xbox & PC Game Pass
+Launch games installed via the Xbox PC App / PC Game Pass using their `gamelaunchhelper.exe` wrapper:
+
+- **Target**: `"C:\Tools\NonSteamLauncher.exe"`
+- **Launch Options**: `"C:\XboxGames\Forza Horizon 5\gamelaunchhelper.exe" --close-launcher`
 
 ---
 

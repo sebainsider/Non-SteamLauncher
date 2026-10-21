@@ -121,20 +121,46 @@ public class SteamSyncService
 
             foreach (var game in games)
             {
-                // Check if already in shortcuts by AppName or by LaunchUri inside LaunchOptions
-                bool alreadyExists = shortcuts.Any(s =>
+                var existingShortcut = shortcuts.FirstOrDefault(s =>
                     s.AppName.Equals(game.Title, StringComparison.OrdinalIgnoreCase) ||
-                    (!string.IsNullOrEmpty(game.LaunchUri) && s.LaunchOptions.Contains(game.LaunchUri, StringComparison.OrdinalIgnoreCase))
+                    (!string.IsNullOrEmpty(game.LaunchUri) && s.LaunchOptions.Contains(game.LaunchUri, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(game.ExecutablePath) && s.Exe.Trim('"', '\'').Equals(game.ExecutablePath, StringComparison.OrdinalIgnoreCase))
                 );
 
-                if (alreadyExists)
+                if (existingShortcut != null)
                 {
-                    profileExisting++;
-                    if (!result.ExistingGames.Any(g => g.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase)))
+                    // Check if existing shortcut in Steam is already using NonSteamLauncher
+                    if (existingShortcut.Exe.Contains("NonSteamLauncher", StringComparison.OrdinalIgnoreCase))
                     {
-                        result.ExistingGames.Add(game);
+                        profileExisting++;
+                        if (!result.ExistingGames.Any(g => g.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            result.ExistingGames.Add(game);
+                        }
+                        _logger.LogDebug($"  Game '{game.Title}' already configured with NonSteamLauncher. Skipping.");
+                        continue;
                     }
-                    _logger.LogDebug($"  Game '{game.Title}' already configured in Steam. Skipping.");
+
+                    // Existing shortcut calls the .exe directly! Upgrade it to use NonSteamLauncher wrapper
+                    _logger.LogInfo($"  ⚡ Upgrading existing Steam shortcut '{existingShortcut.AppName}' from direct exe to NonSteamLauncher wrapper...");
+                    existingShortcut.Exe = exePath;
+                    existingShortcut.StartDir = startDir;
+                    existingShortcut.LaunchOptions = $"--launch \"{game.LaunchUri}\" --close-launcher --disable-overlay";
+                    if (string.IsNullOrEmpty(existingShortcut.Icon) && !string.IsNullOrEmpty(game.IconPath))
+                    {
+                        existingShortcut.Icon = game.IconPath;
+                    }
+                    if (!existingShortcut.Tags.Contains(game.Launcher))
+                    {
+                        existingShortcut.Tags.Add(game.Launcher);
+                    }
+
+                    profileAdded++;
+                    if (!result.AddedGames.Any(g => g.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        result.AddedGames.Add(game);
+                    }
+                    _logger.LogInfo($"  ✔ Upgraded [{game.Launcher}] {game.Title} to NonSteamLauncher wrapper!");
                     continue;
                 }
 
@@ -161,6 +187,48 @@ public class SteamSyncService
                     result.AddedGames.Add(game);
                 }
                 _logger.LogInfo($"  + Added [{game.Launcher}] {game.Title} (AppID: {newShortcut.AppId})");
+            }
+
+            // Inspect any other existing shortcuts in shortcuts.vdf:
+            // If they point directly to an exe belonging to a known launcher, upgrade them!
+            foreach (var s in shortcuts)
+            {
+                if (s.Exe.Contains("NonSteamLauncher", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string cleanExe = s.Exe.Trim('"', '\'');
+                string? detectedLauncher = DetectLauncherFromPath(cleanExe, s.StartDir);
+                if (detectedLauncher != null)
+                {
+                    _logger.LogInfo($"  ⚡ Detected direct-exe shortcut '{s.AppName}' [{detectedLauncher}]. Upgrading to NonSteamLauncher...");
+                    s.Exe = exePath;
+                    s.StartDir = startDir;
+                    s.LaunchOptions = $"--launch \"{cleanExe}\" --close-launcher --disable-overlay";
+                    if (string.IsNullOrEmpty(s.Icon) && File.Exists(cleanExe))
+                    {
+                        s.Icon = cleanExe;
+                    }
+                    if (!s.Tags.Contains(detectedLauncher))
+                    {
+                        s.Tags.Add(detectedLauncher);
+                    }
+
+                    var adoptedGame = new InstalledGame
+                    {
+                        Title = s.AppName,
+                        Launcher = detectedLauncher,
+                        LaunchUri = cleanExe,
+                        ExecutablePath = cleanExe,
+                        IconPath = s.Icon
+                    };
+
+                    profileAdded++;
+                    if (!result.AddedGames.Any(g => g.Title.Equals(adoptedGame.Title, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        result.AddedGames.Add(adoptedGame);
+                    }
+                    _logger.LogInfo($"  ✔ Upgraded [{detectedLauncher}] {s.AppName} to NonSteamLauncher wrapper!");
+                }
             }
 
             result.AddedShortcutsCount += profileAdded;
@@ -205,5 +273,48 @@ public class SteamSyncService
         result.Success = true;
         _logger.LogInfo("=== Steam Library Sync Completed Successfully ===");
         return result;
+    }
+
+    public static string? DetectLauncherFromPath(string exePath, string? startDir)
+    {
+        string combined = $"{exePath} {startDir}";
+
+        if (combined.Contains("EA Games", StringComparison.OrdinalIgnoreCase) ||
+            combined.Contains("Origin Games", StringComparison.OrdinalIgnoreCase) ||
+            combined.Contains("Electronic Arts", StringComparison.OrdinalIgnoreCase))
+        {
+            return "EA App";
+        }
+
+        if (combined.Contains("Ubisoft", StringComparison.OrdinalIgnoreCase) ||
+            combined.Contains("Uplay", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Ubisoft Connect";
+        }
+
+        if (combined.Contains("Epic Games", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Epic Games";
+        }
+
+        if (combined.Contains("GOG Games", StringComparison.OrdinalIgnoreCase) ||
+            combined.Contains("GOG Galaxy", StringComparison.OrdinalIgnoreCase))
+        {
+            return "GOG Galaxy";
+        }
+
+        if (combined.Contains("Battle.net", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Battle.net";
+        }
+
+        if (combined.Contains("XboxGames", StringComparison.OrdinalIgnoreCase) ||
+            combined.Contains("WindowsApps", StringComparison.OrdinalIgnoreCase) ||
+            combined.Contains("gamelaunchhelper", StringComparison.OrdinalIgnoreCase))
+        {
+            return "Xbox";
+        }
+
+        return null;
     }
 }

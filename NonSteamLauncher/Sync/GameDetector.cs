@@ -19,8 +19,10 @@ public class GameDetector
             _scanners = new List<IScanner>
             {
                 new EpicGamesScanner(logger: _logger),
+                new EAAppScanner(logger: _logger),
                 new UbisoftScanner(logger: _logger),
                 new GogScanner(logger: _logger),
+                new XboxScanner(logger: _logger),
                 new DesktopShortcutScanner(logger: _logger)
             };
         }

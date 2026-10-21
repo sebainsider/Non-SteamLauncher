@@ -96,6 +96,15 @@ public static class LauncherFilter
         "vgtray",
         "vgc",
 
+        // Xbox & PC Game Pass
+        "gamelaunchhelper",
+        "XboxPcApp",
+        "XboxPcAppFT",
+        "XboxApp",
+        "XboxGamingOverlay",
+        "GamingServices",
+        "gamingservicesnet",
+
         // Windows Shell / System utilities
         "cmd",
         "powershell",

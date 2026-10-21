@@ -46,6 +46,15 @@ public class DefaultProcessProvider : IProcessProvider
                 UseShellExecute = true
             };
 
+            if (File.Exists(cleanCommand))
+            {
+                string? dir = Path.GetDirectoryName(cleanCommand);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    startInfo.WorkingDirectory = dir;
+                }
+            }
+
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
@@ -310,6 +319,12 @@ public class DefaultProcessProvider : IProcessProvider
             launchCommand.Contains("galaxy", StringComparison.OrdinalIgnoreCase))
         {
             return new[] { "GalaxyClient", "GalaxyClientService", "GalaxyCommunication", "GalaxyOverlay" };
+        }
+        if (launchCommand.Contains("xbox", StringComparison.OrdinalIgnoreCase) ||
+            launchCommand.Contains("XboxGames", StringComparison.OrdinalIgnoreCase) ||
+            launchCommand.Contains("gamelaunchhelper", StringComparison.OrdinalIgnoreCase))
+        {
+            return new[] { "XboxPcApp", "XboxApp" };
         }
 
         return new[] { "EpicGamesLauncher", "EpicWebHelper", "EpicOnlineServicesHost", "EpicOnlineServices", "EADesktop", "UbisoftConnect", "GalaxyClient", "Battle.net" };

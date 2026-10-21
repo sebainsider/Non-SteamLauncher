@@ -1,0 +1,124 @@
+{
+  "png": [
+    {
+      "size": 16,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 20,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 24,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 30,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 32,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 36,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 40,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 48,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 60,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 64,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 72,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 80,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 96,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 128,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 256,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 512,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    },
+    {
+      "size": 1024,
+      "RGBA": true,
+      "transparent_margin": true,
+      "opaque_surface": true
+    }
+  ],
+  "ico_sizes": [
+    16,
+    20,
+    24,
+    30,
+    32,
+    36,
+    40,
+    48,
+    60,
+    64,
+    72,
+    80,
+    96,
+    128,
+    256
+  ],
+  "ico_matches_png": true
+}
