@@ -2,6 +2,7 @@ namespace NonSteamLauncher;
 
 public static class Program
 {
+    [STAThread]
     public static async Task<int> Main(string[] args)
     {
         var (options, errorMessage) = Options.Parse(args);

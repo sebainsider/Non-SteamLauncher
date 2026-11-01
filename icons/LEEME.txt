@@ -1,4 +1,0 @@
-Colección ampliada: escala visual +31%. Silueta 87% ancho y 90% alto.
-SVG, PNG 16–1024 px e ICO de 15 resoluciones.
-Dimensiones, esquinas transparentes, opacidad interior y lectura del ICO verificadas.
-No probado integrado en Windows.

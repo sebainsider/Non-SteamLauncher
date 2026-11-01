@@ -2,14 +2,15 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>NonSteamLauncher</RootNamespace>
     <AssemblyName>NonSteamLauncher</AssemblyName>
-    <Version>1.8.1</Version>
+    <Version>1.9.0</Version>
     
-    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <ApplicationIcon>Assets\Icons\NonSteamLauncher.ico</ApplicationIcon>
     
     <!-- Windows target & single file executable properties -->
     <PublishSingleFile>true</PublishSingleFile>
@@ -17,5 +18,16 @@
     <IncludeNativeLibrariesForSelfExtract>false</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>false</EnableCompressionInSingleFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\Icons\NonSteamLauncher.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+    <Using Include="System.Net.Http" />
+  </ItemGroup>
 
 </Project>

@@ -1,8 +1,8 @@
-# Non-Steam Launcher
+# Non-Steam Launcher 🚀
 
 <p align="center">
-  <img src="NonSteamLauncher/icon.png" width="128" alt="Non-Steam Launcher Icon" /><br>
-  <strong>v1.8.1</strong><br>
+  <img src="NonSteamLauncher/Assets/Icons/NonSteamLauncher.png" width="128" alt="Non-Steam Launcher Icon" /><br>
+  <strong>v1.9.0</strong><br>
   <em>The seamless bridge between third-party PC launchers and Steam.</em>
 </p>
 
@@ -11,9 +11,13 @@
   <a href="README.es.md"><strong>Español</strong></a>
 </p>
 
+<p align="center">
+  <img src="docs/images/ui-preview.png" alt="Non-Steam Launcher UI Preview" width="750" />
+</p>
+
 ---
 
-**Non-Steam Launcher** is a lightweight, zero-dependency .NET 9 Windows utility that automatically detects and syncs games installed across third-party launchers (**Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, and Xbox / PC Game Pass**) directly into your **Steam** library, complete with artwork.
+**Non-Steam Launcher** is a lightweight .NET 9 Windows utility that automatically detects and syncs games installed across third-party launchers (**Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, and Xbox / PC Game Pass**) directly into your **Steam** library, complete with artwork.
 
 It also solves Steam's playtime tracking issue by monitoring the real game process instead of the background launcher client.
 
@@ -27,6 +31,14 @@ It also solves Steam's playtime tracking issue by monitoring the real game proce
 - 🧠 **Smart Auto-Detect**: Distinguishes the real game executable from launcher background processes (`EpicGamesLauncher`, `EADesktop`, `UbisoftConnect`, etc.).
 - ⏱️ **Accurate Playtime Tracking**: Keeps Steam's "In-Game" status active until you actually exit the game, ensuring correct play hours.
 - 🛡️ **Safe & Non-Destructive**: Backs up `shortcuts.vdf` before writing and preserves all existing custom shortcuts.
+
+---
+
+## 📸 Interface Preview
+
+<p align="center">
+  <img src="docs/images/ui-preview.png" alt="Library Sync and Settings UI" width="800" />
+</p>
 
 ---
 

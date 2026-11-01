@@ -21,7 +21,34 @@ public static class SyncStatusDialog
 
         try
         {
-            return NativeDialogWindow.ShowDialog(result, onSyncSelected, onSettingsSaved, settingsFilePath);
+            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+            {
+                var win = new SyncStatusWindow(result, onSyncSelected, onSettingsSaved, settingsFilePath);
+                win.ShowDialog();
+                return win.Result;
+            }
+            else
+            {
+                SteamSyncResult finalResult = result;
+                var staThread = new Thread(() =>
+                {
+                    try
+                    {
+                        var win = new SyncStatusWindow(result, onSyncSelected, onSettingsSaved, settingsFilePath);
+                        win.ShowDialog();
+                        finalResult = win.Result;
+                    }
+                    catch (Exception)
+                    {
+                        PrintConsoleFallback(result);
+                    }
+                });
+                staThread.SetApartmentState(ApartmentState.STA);
+                staThread.IsBackground = false;
+                staThread.Start();
+                staThread.Join();
+                return finalResult;
+            }
         }
         catch (Exception)
         {
@@ -72,7 +99,7 @@ public static class SyncStatusDialog
         private const string WindowClassName = "NonSteamLauncher_Fluent2WinUI3Dialog_Class";
 
         // Logical Design Dimensions (96 DPI Base — 4px/8px Fluent 2 Grid, Content-Adaptive Height)
-        private const int BaseClientWidth = 600;
+        private const int BaseClientWidth = 620;
         private const int MaxVisibleGameRows = 5;
 
         // Per-Monitor V2 DPI Awareness Contexts
@@ -646,6 +673,9 @@ public static class SyncStatusDialog
         [DllImport("gdi32.dll", EntryPoint = "GetTextExtentPoint32W", CharSet = CharSet.Unicode)]
         private static extern bool GetTextExtentPoint32W(IntPtr hdc, string lpString, int c, out SIZE psizl);
 
+        [DllImport("gdi32.dll", EntryPoint = "GetGlyphIndicesW", CharSet = CharSet.Unicode)]
+        private static extern uint GetGlyphIndicesW(IntPtr hdc, string lpstr, int c, [Out] ushort[] pgi, uint fl);
+
         [DllImport("user32.dll", EntryPoint = "DrawTextW", CharSet = CharSet.Unicode)]
         private static extern int DrawTextW(IntPtr hDC, string lpchText, int cchText, ref RECT lprc, uint format);
 
@@ -948,14 +978,50 @@ public static class SyncStatusDialog
             DrawSmoothLine(g, centerX + half, centerY - half, centerX - half, centerY + half, colorArgb, strokeW);
         }
 
+        // Official Microsoft Segoe Fluent Icons / Segoe MDL2 Assets PUA Codepoints
+        private const string FluentIconSettings = "\uE713";
+        private const string FluentIconBack = "\uE72B";
+        private const string FluentIconCheckMark = "\uE73E";
+        private const string FluentIconCancel = "\uE711";
+        private const string FluentIconSync = "\uE895";
+        private const string FluentIconErrorBadge = "\uE783";
+        private const string FluentIconGamepad = "\uE7FC";
+        private const string FluentIconPhoto = "\uEB9F";
+        private const string FluentIconKey = "\uE8D7";
+        private const string FluentIconPaste = "\uE77F";
+        private const string FluentIconDelete = "\uE74D";
+        private const string FluentIconExternalLink = "\uE8A7";
+
+        private static bool TryDrawFluentFontGlyph(IntPtr hdc, IntPtr iconFont, string glyph, RECT bounds, uint colorRef)
+        {
+            if (hdc == IntPtr.Zero || iconFont == IntPtr.Zero || string.IsNullOrEmpty(glyph))
+                return false;
+
+            IntPtr oldFont = SelectObject(hdc, iconFont);
+            try
+            {
+                ushort[] indices = new ushort[1];
+                uint res = GetGlyphIndicesW(hdc, glyph, 1, indices, 1 /* GGI_MARK_NONEXISTING_GLYPHS */);
+                if (res == 0xFFFFFFFF || indices[0] == 0xFFFF || indices[0] == 0)
+                    return false;
+
+                SetTextColor(hdc, colorRef);
+                DrawTextW(hdc, glyph, -1, ref bounds, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+                return true;
+            }
+            finally
+            {
+                SelectObject(hdc, oldFont);
+            }
+        }
+
         private static void DrawVectorSettingsGear(IntPtr g, float cx, float cy, float size, uint colorArgb)
         {
-            float sw = Math.Max(1.5f, Sf(1.7f));
-            float outerR = size * 0.34f;
-            float bodyR = size * 0.24f;
-            float holeR = size * 0.10f;
+            float sw = Math.Max(1.4f, Sf(1.6f));
+            float outerR = size * 0.36f;
+            float bodyR = size * 0.25f;
+            float holeR = size * 0.11f;
 
-            // 8 gear teeth around center
             for (int i = 0; i < 8; i++)
             {
                 double angle = i * (Math.PI / 4.0);
@@ -963,17 +1029,16 @@ public static class SyncStatusDialog
                 float sin = (float)Math.Sin(angle);
                 DrawSmoothLine(
                     g,
-                    cx + cos * (bodyR * 0.78f),
-                    cy + sin * (bodyR * 0.78f),
+                    cx + cos * (bodyR * 0.85f),
+                    cy + sin * (bodyR * 0.85f),
                     cx + cos * outerR,
                     cy + sin * outerR,
                     colorArgb,
-                    sw * 1.15f);
+                    sw * 1.25f);
             }
 
-            // Outer ring & inner hub
-            DrawSmoothCircle(g, cx - bodyR, cy - bodyR, bodyR * 2f, 0, colorArgb, sw);
-            DrawSmoothCircle(g, cx - holeR, cy - holeR, holeR * 2f, 0, colorArgb, sw * 0.9f);
+            DrawSmoothCircle(g, cx - bodyR, cy - bodyR, bodyR * 2f, ToArgb(_theme.CardDefault), colorArgb, sw);
+            DrawSmoothCircle(g, cx - holeR, cy - holeR, holeR * 2f, 0, colorArgb, sw);
         }
 
         private static string GetKeyboardGlyphLabel(InputGlyph glyph) => glyph switch
@@ -987,15 +1052,8 @@ public static class SyncStatusDialog
 
         private static int MeasureInputGlyphBadgeWidth(IntPtr hdc, IntPtr fontBadge, int height, InputGlyph glyph)
         {
-            if (glyph == InputGlyph.None)
+            if (glyph == InputGlyph.None || _gamepadType == GamepadType.Keyboard)
                 return 0;
-
-            if (_gamepadType == GamepadType.Keyboard)
-            {
-                string keyLabel = GetKeyboardGlyphLabel(glyph);
-                int textW = MeasureTextWidth(hdc, fontBadge, keyLabel);
-                return Math.Max(height + S(6), textW + S(12));
-            }
 
             return height;
         }
@@ -1010,7 +1068,7 @@ public static class SyncStatusDialog
             bool onPrimaryButton,
             IntPtr fontBadge)
         {
-            if (glyph == InputGlyph.None)
+            if (glyph == InputGlyph.None || _gamepadType == GamepadType.Keyboard)
                 return 0;
 
             int top = centerY - height / 2;
@@ -1195,7 +1253,11 @@ public static class SyncStatusDialog
                 string baseDir = AppContext.BaseDirectory;
                 string[] candidatePaths =
                 {
+                    Path.Combine(baseDir, "Assets", "Icons", "NonSteamLauncher.ico"),
+                    Path.Combine(baseDir, "Assets", "Icons", "NonSteamLauncher-B.ico"),
                     Path.Combine(baseDir, "icon.ico"),
+                    Path.Combine(baseDir, "..", "..", "..", "Assets", "Icons", "NonSteamLauncher.ico"),
+                    Path.Combine(baseDir, "..", "..", "..", "Assets", "Icons", "NonSteamLauncher-B.ico"),
                     Path.Combine(baseDir, "..", "..", "..", "icon.ico"),
                     Path.Combine(baseDir, "..", "..", "..", "..", "icons", "Non-Steam-Launcher.ico")
                 };
@@ -1384,24 +1446,27 @@ public static class SyncStatusDialog
             };
         }
 
-        private static int GetRowHeight() => (int)Math.Round(S(48) * Math.Max(1.0, (_textScale - 1.0) * 0.55 + 1.0));
+        private static int GetRowHeight() => (int)Math.Round(S(58) * Math.Max(1.0, (_textScale - 1.0) * 0.55 + 1.0));
 
         private static int CalculateIdealClientHeight(int itemCount)
         {
             int effectiveCount = _isSettingsView ? Math.Max(itemCount, 3) : itemCount;
             int visibleSlots = Math.Clamp(effectiveCount, 1, MaxVisibleGameRows);
-            int topPad = S(20);
-            int heroBannerH = Math.Max(S(52), SF(46));
-            int sectionGap = S(16);
-            int sectionHeaderH = Math.Max(S(22), SF(20));
+            int topPad = S(18);
+            int headerH = S(32);
+            int headerGap = S(12);
+            int heroBannerH = Math.Max(S(52), SF(48));
+            int sectionGap = S(14);
+            int sectionHeaderH = Math.Max(S(20), SF(18));
             int listTopGap = S(8);
             int rowH = GetRowHeight();
             int rowGap = S(6);
             int listContentH = visibleSlots * rowH + Math.Max(0, visibleSlots - 1) * rowGap;
-            int listBottomPad = S(20);
+            int listBottomPad = S(14);
             int footerH = S(60);
 
-            return topPad + heroBannerH + sectionGap + sectionHeaderH + listTopGap + listContentH + listBottomPad + footerH;
+            int totalH = topPad + headerH + headerGap + heroBannerH + sectionGap + sectionHeaderH + listTopGap + listContentH + listBottomPad + footerH;
+            return Math.Max(S(420), totalH);
         }
 
         private static void EnsureWindowHeightForCurrentView(IntPtr hWnd)
@@ -2993,27 +3058,126 @@ public static class SyncStatusDialog
                 DrawSmoothLine(g, 0f, footerTop, clientW, footerTop, ToArgb(_theme.Divider), Math.Max(1f, (float)Math.Round(_dpiScale * 0.8)));
             }
 
-            // 2. Fluent 2 Type Ramp Fonts
-            IntPtr fontTitle = CreateFluentFont(-SF(16), 600, "Segoe UI Variable Display");
+            // 2. Fluent 2 Type Ramp & Official Iconography Fonts (Segoe Fluent Icons / Segoe MDL2 Assets)
+            IntPtr fontAppTitle = CreateFluentFont(-SF(17), 600, "Segoe UI Variable Display");
             IntPtr fontBodyStrong = CreateFluentFont(-SF(14), 600, "Segoe UI Variable Text");
             IntPtr fontBody = CreateFluentFont(-SF(14), 400, "Segoe UI Variable Text");
             IntPtr fontCaptionStrong = CreateFluentFont(-SF(12), 600, "Segoe UI Variable Text");
             IntPtr fontCaption = CreateFluentFont(-SF(12), 400, "Segoe UI Variable Text");
+            IntPtr fontIconMedium = CreateFluentIconFont(-SF(16));
+            IntPtr fontIconSmall = CreateFluentIconFont(-SF(12));
 
-            // 3. Fluent 2 Hero Status Card (WinUI 3 InfoBar)
-            int heroTop = S(20);
-            int heroHeight = Math.Max(S(52), SF(46));
+            // 3. Modern Window Header Bar: App Icon + App Title on Left, Settings/Back Action on Right
+            int headerTop = S(18);
+            int headerH = S(32);
+            int headerBottom = headerTop + headerH;
+
+            int appIconSize = S(24);
+            int appIconX = marginX;
+            int appIconY = headerTop + (headerH - appIconSize) / 2;
+            if (_hWindowIconSmall != IntPtr.Zero)
+            {
+                DrawIconEx(hdc, appIconX, appIconY, _hWindowIconSmall, appIconSize, appIconSize, 0, IntPtr.Zero, DI_NORMAL);
+            }
+            else
+            {
+                DrawSmoothRoundedCard(g, appIconX, appIconY, appIconSize, appIconSize, Sf(6f), ToArgb(_theme.AccentDefault), 0, 0);
+                var rcIco = new RECT { Left = appIconX, Top = appIconY, Right = appIconX + appIconSize, Bottom = appIconY + appIconSize };
+                TryDrawFluentFontGlyph(hdc, fontIconSmall, FluentIconGamepad, rcIco, _theme.TextOnAccent);
+            }
+
+            // Fluent 2 Settings / Back Button on top-right of header: [ ⚙ SteamGridDB ] or [ ← Volver ]
+            string settingsLabel = _isSettingsView ? _strings.SettingsSaveBackButton : _strings.SettingsButton;
+            int settingsLabelW = MeasureTextWidth(hdc, fontCaptionStrong, settingsLabel);
+            int settingsBtnW = S(10) + S(16) + S(6) + settingsLabelW + S(12);
+            _btnSettingsRect = new RECT
+            {
+                Left = clientW - marginX - settingsBtnW,
+                Top = headerTop,
+                Right = clientW - marginX,
+                Bottom = headerBottom
+            };
+
+            SelectObject(hdc, fontAppTitle);
+            SetTextColor(hdc, _theme.TextPrimary);
+            var rcAppTitle = new RECT
+            {
+                Left = appIconX + appIconSize + S(10),
+                Top = headerTop,
+                Right = _btnSettingsRect.Left - S(10),
+                Bottom = headerBottom
+            };
+            DrawTextW(hdc, _strings.WindowTitle, -1, ref rcAppTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+            uint gearFill = _isSettingsView
+                ? ToArgb(_theme.AccentDefault, _theme.IsLight ? (byte)24 : (byte)40)
+                : (_hoverSettings ? ToArgb(_theme.CardHover) : ToArgb(_theme.CardDefault));
+            uint gearStroke = (_isSettingsView || _hoverSettings)
+                ? ToArgb(_theme.AccentDefault)
+                : ToArgb(_theme.CardStroke);
+            uint gearTextCol = _isSettingsView
+                ? _theme.AccentDefault
+                : _theme.TextPrimary;
+
+            uint gearShadow = _theme.IsHighContrast
+                ? 0
+                : ToArgb(Rgb(0, 0, 0), _theme.IsLight ? (byte)12 : (byte)28);
+
+            DrawSmoothRoundedCard(
+                g,
+                _btnSettingsRect.Left,
+                _btnSettingsRect.Top,
+                _btnSettingsRect.Width,
+                _btnSettingsRect.Height,
+                Sf(6f),
+                gearFill,
+                gearStroke,
+                1f,
+                gearShadow);
+
+            var rcGearGlyph = new RECT
+            {
+                Left = _btnSettingsRect.Left + S(8),
+                Top = _btnSettingsRect.Top,
+                Right = _btnSettingsRect.Left + S(26),
+                Bottom = _btnSettingsRect.Bottom
+            };
+            string settingsGlyph = _isSettingsView ? FluentIconBack : FluentIconSettings;
+            if (!TryDrawFluentFontGlyph(hdc, fontIconSmall, settingsGlyph, rcGearGlyph, gearTextCol))
+            {
+                DrawVectorSettingsGear(
+                    g,
+                    (rcGearGlyph.Left + rcGearGlyph.Right) / 2f,
+                    (rcGearGlyph.Top + rcGearGlyph.Bottom) / 2f,
+                    S(14),
+                    ToArgb(gearTextCol));
+            }
+
+            SelectObject(hdc, fontCaptionStrong);
+            SetTextColor(hdc, gearTextCol);
+            var rcGearLabel = new RECT
+            {
+                Left = rcGearGlyph.Right + S(2),
+                Top = _btnSettingsRect.Top,
+                Right = _btnSettingsRect.Right - S(10),
+                Bottom = _btnSettingsRect.Bottom
+            };
+            DrawTextW(hdc, settingsLabel, -1, ref rcGearLabel, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
+
+            // 4. Fluent 2 Hero Status Card (WinUI 3 InfoBar — Elevated Card Surface, Two-Line Text)
+            int heroTop = headerBottom + S(12);
+            int heroHeight = Math.Max(S(52), SF(48));
             int heroBottom = heroTop + heroHeight;
-            DrawFluentHeroBanner(hdc, g, marginX, heroTop, clientW - marginX, heroBottom, result, fontTitle);
+            DrawFluentHeroBanner(hdc, g, marginX, heroTop, clientW - marginX, heroBottom, result, fontBodyStrong, fontCaption, fontIconMedium);
 
-            // 4. Section Header & Rounded Counter Pill
+            // 5. Section Header & Subtle Neutral Counter Pill
             string sectionHeader = _isSettingsView ? _strings.SettingsTitle : _strings.CardHeaderDetected;
             string countText = $"{_totalRows}";
             int countPillW = Math.Max(S(26), MeasureTextWidth(hdc, fontCaptionStrong, countText) + S(14));
             int countPillH = Math.Max(S(20), SF(18));
 
-            int secTop = heroBottom + S(16);
-            int secHeight = Math.Max(S(22), SF(20));
+            int secTop = heroBottom + S(14);
+            int secHeight = Math.Max(S(20), SF(18));
             int secBottom = secTop + secHeight;
 
             if (!_isSettingsView && result != null && result.Success)
@@ -3024,15 +3188,15 @@ public static class SyncStatusDialog
 
                 uint pillFill = _theme.IsHighContrast
                     ? ToArgb(_theme.TagFill)
-                    : ToArgb(_theme.AccentDefault, _theme.IsLight ? (byte)24 : (byte)36);
+                    : ToArgb(_theme.CardDefault);
                 uint pillStroke = _theme.IsHighContrast
                     ? ToArgb(_theme.TagStroke)
-                    : ToArgb(_theme.AccentDefault, _theme.IsLight ? (byte)55 : (byte)70);
+                    : ToArgb(_theme.CardStroke);
 
                 DrawSmoothRoundedCard(g, pillLeft, pillTop, countPillW, countPillH, countPillH / 2f, pillFill, pillStroke, 1f);
 
                 SelectObject(hdc, fontCaptionStrong);
-                SetTextColor(hdc, _theme.IsHighContrast ? _theme.TextPrimary : _theme.AccentDefault);
+                SetTextColor(hdc, _theme.TextSecondary);
                 var rcSecCount = new RECT { Left = pillLeft, Top = pillTop, Right = pillRight, Bottom = pillTop + countPillH };
                 DrawTextW(hdc, countText, -1, ref rcSecCount, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
             }
@@ -3048,18 +3212,18 @@ public static class SyncStatusDialog
             };
             DrawTextW(hdc, sectionHeader, -1, ref rcSecLabel, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 
-            // 5. Fluent 2 Interactive SettingsCard List Area
+            // 6. Fluent 2 Interactive SettingsCard List Area
             _listAreaRect = new RECT
             {
                 Left = marginX,
                 Top = secBottom + S(8),
                 Right = clientW - marginX,
-                Bottom = footerTop - S(16)
+                Bottom = footerTop - S(14)
             };
 
             if (_isSettingsView)
             {
-                DrawFluentSettingsPanel(hdc, g, _listAreaRect, fontBodyStrong, fontBody, fontCaptionStrong);
+                DrawFluentSettingsPanel(hdc, g, _listAreaRect, fontBodyStrong, fontBody, fontCaptionStrong, fontIconMedium, fontIconSmall);
             }
             else if (result != null && result.Success)
             {
@@ -3070,7 +3234,7 @@ public static class SyncStatusDialog
                         _listAreaRect.Left,
                         _listAreaRect.Top,
                         _listAreaRect.Width,
-                        Math.Max(S(48), _listAreaRect.Height),
+                        Math.Max(S(56), _listAreaRect.Height),
                         Sf(8f),
                         ToArgb(_theme.CardDefault),
                         ToArgb(_theme.CardStroke),
@@ -3083,7 +3247,7 @@ public static class SyncStatusDialog
                         Left = _listAreaRect.Left + S(16),
                         Top = _listAreaRect.Top,
                         Right = _listAreaRect.Right - S(16),
-                        Bottom = _listAreaRect.Top + Math.Max(S(48), _listAreaRect.Height)
+                        Bottom = _listAreaRect.Top + Math.Max(S(56), _listAreaRect.Height)
                     };
                     DrawTextW(hdc, _strings.EmptyMessage, -1, ref rcEmpty, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
                 }
@@ -3122,7 +3286,10 @@ public static class SyncStatusDialog
                             isHovered,
                             isFocused,
                             fontBodyStrong,
-                            fontCaptionStrong);
+                            fontCaption,
+                            fontCaptionStrong,
+                            fontIconMedium,
+                            fontIconSmall);
 
                         rowY += rowH + rowGap;
                     }
@@ -3146,7 +3313,7 @@ public static class SyncStatusDialog
                     _listAreaRect.Left,
                     _listAreaRect.Top,
                     _listAreaRect.Width,
-                    Math.Max(S(48), _listAreaRect.Height),
+                    Math.Max(S(56), _listAreaRect.Height),
                     Sf(8f),
                     ToArgb(_theme.CardDefault),
                     ToArgb(_theme.CriticalBorder),
@@ -3164,7 +3331,7 @@ public static class SyncStatusDialog
                 DrawTextW(hdc, result?.ErrorMessage ?? _strings.HeaderError, -1, ref rcErr, DT_LEFT | DT_WORDBREAK | DT_NOPREFIX);
             }
 
-            // 6. Command Space Footer Buttons (Settings Icon Bottom-Left + Primary Add/SelectAll + Close)
+            // 7. Command Space Footer Buttons (Primary Add/SelectAll + Close)
             int unsyncedCount = GetUnsyncedCount();
             int selectedCount = GetSelectedUnsyncedCount();
             bool showPrimaryBtn = _isSettingsView || unsyncedCount > 0;
@@ -3172,47 +3339,10 @@ public static class SyncStatusDialog
             int btnH = Math.Max(S(32), SF(30));
             int btnTop = footerTop + (footerHeight - btnH) / 2;
 
-            // Icon-only Settings button on bottom-left of footer
-            _btnSettingsRect = new RECT
-            {
-                Left = marginX,
-                Top = btnTop,
-                Right = marginX + btnH,
-                Bottom = btnTop + btnH
-            };
-
-            uint gearFill = _isSettingsView
-                ? ToArgb(_theme.AccentDefault, _theme.IsLight ? (byte)32 : (byte)48)
-                : (_hoverSettings ? ToArgb(_theme.CardHover) : ToArgb(_theme.CardDefault));
-            uint gearStroke = (_isSettingsView || _hoverSettings)
-                ? ToArgb(_theme.AccentDefault)
-                : ToArgb(_theme.TagStroke);
-            uint gearIconCol = _isSettingsView
-                ? ToArgb(_theme.AccentDefault)
-                : ToArgb(_theme.TextPrimary);
-
-            DrawSmoothRoundedCard(
-                g,
-                _btnSettingsRect.Left,
-                _btnSettingsRect.Top,
-                _btnSettingsRect.Width,
-                _btnSettingsRect.Height,
-                Sf(6f),
-                gearFill,
-                gearStroke,
-                1f);
-
-            DrawVectorSettingsGear(
-                g,
-                _btnSettingsRect.Left + _btnSettingsRect.Width / 2f,
-                _btnSettingsRect.Top + _btnSettingsRect.Height / 2f,
-                _btnSettingsRect.Height * 0.56f,
-                gearIconCol);
-
             int badgeH = Math.Max(S(18), SF(17));
             int closeBadgeW = MeasureInputGlyphBadgeWidth(hdc, fontCaptionStrong, badgeH, InputGlyph.Cancel);
             int closeTextW = MeasureTextWidth(hdc, fontBodyStrong, _strings.ActionClose);
-            int closeBtnW = Math.Max(S(104), closeTextW + closeBadgeW + S(34));
+            int closeBtnW = Math.Max(S(96), closeTextW + closeBadgeW + S(28));
             _btnCloseRect = new RECT
             {
                 Left = clientW - marginX - closeBtnW,
@@ -3233,7 +3363,7 @@ public static class SyncStatusDialog
 
                 int primaryBadgeW = MeasureInputGlyphBadgeWidth(hdc, fontCaptionStrong, badgeH, InputGlyph.PrimaryAction);
                 int primaryTextW = MeasureTextWidth(hdc, fontBodyStrong, primaryLabel);
-                int primaryBtnW = Math.Max(S(142), primaryTextW + primaryBadgeW + S(34));
+                int primaryBtnW = Math.Max(S(132), primaryTextW + primaryBadgeW + S(28));
                 int primaryRight = _btnCloseRect.Left - S(8);
                 _btnPrimaryRect = new RECT
                 {
@@ -3278,7 +3408,7 @@ public static class SyncStatusDialog
                     g,
                     _btnCloseRect,
                     _strings.ActionClose,
-                    isPrimaryAccent: true,
+                    isPrimaryAccent: false,
                     isHovered: _hoverClose,
                     isPressed: _pressedClose,
                     isFocused: _focusedZone == FocusZone.CloseButton,
@@ -3287,19 +3417,21 @@ public static class SyncStatusDialog
                     fontCaptionStrong);
             }
 
-            // 7. Controller / Joystick Navigation Legend on Footer Left (next to Settings Icon)
-            DrawControllerHintLegend(hdc, g, _btnSettingsRect.Right + S(12), footerTop, buttonsLeftEdge - S(12), clientH, unsyncedCount > 0, fontCaption, fontCaptionStrong);
+            // 8. Controller Navigation Legend (ONLY shown when Xbox/PlayStation controller is active)
+            DrawControllerHintLegend(hdc, g, marginX, footerTop, buttonsLeftEdge - S(12), clientH, unsyncedCount > 0, fontCaption, fontCaptionStrong);
 
             if (g != IntPtr.Zero)
             {
                 GdipDeleteGraphics(g);
             }
 
-            DeleteObject(fontTitle);
+            DeleteObject(fontAppTitle);
             DeleteObject(fontBodyStrong);
             DeleteObject(fontBody);
             DeleteObject(fontCaptionStrong);
             DeleteObject(fontCaption);
+            DeleteObject(fontIconMedium);
+            DeleteObject(fontIconSmall);
         }
 
         private static void DrawFluentSettingsPanel(
@@ -3308,7 +3440,9 @@ public static class SyncStatusDialog
             RECT area,
             IntPtr fontBodyStrong,
             IntPtr fontBody,
-            IntPtr fontCaptionStrong)
+            IntPtr fontCaptionStrong,
+            IntPtr fontIconMedium,
+            IntPtr fontIconSmall)
         {
             int cardGap = S(8);
             int toggleCardH = GetRowHeight();
@@ -3320,6 +3454,10 @@ public static class SyncStatusDialog
                 Bottom = area.Top + toggleCardH
             };
 
+            uint shadowCol = _theme.IsHighContrast
+                ? 0
+                : (_theme.IsLight ? ToArgb(Rgb(0, 0, 0), 8) : ToArgb(Rgb(0, 0, 0), 28));
+
             uint toggleBg = _hoverToggleCard ? _theme.CardHover : _theme.CardDefault;
             DrawSmoothRoundedCard(
                 g,
@@ -3330,60 +3468,89 @@ public static class SyncStatusDialog
                 Sf(8f),
                 ToArgb(toggleBg),
                 ToArgb(_theme.CardStroke),
-                1f);
+                1f,
+                shadowCol);
 
-            int checkSize = Math.Max(S(20), SF(18));
-            int checkX = _settingsToggleCardRect.Left + S(14);
-            int checkY = _settingsToggleCardRect.Top + (_settingsToggleCardRect.Height - checkSize) / 2;
+            // Left Fluent 2 Icon Container (Photo2 / Artwork icon \uEB9F)
+            int iconTileSize = Math.Max(S(34), SF(30));
+            int iconTileX = _settingsToggleCardRect.Left + S(14);
+            int iconTileY = _settingsToggleCardRect.Top + (_settingsToggleCardRect.Height - iconTileSize) / 2;
+
+            uint tileBg = _theme.IsHighContrast
+                ? ToArgb(_theme.TagFill)
+                : ToArgb(_theme.AccentDefault, _theme.IsLight ? (byte)20 : (byte)36);
+            uint tileStroke = _theme.IsHighContrast
+                ? ToArgb(_theme.TagStroke)
+                : ToArgb(_theme.AccentDefault, _theme.IsLight ? (byte)45 : (byte)64);
+
+            DrawSmoothRoundedCard(g, iconTileX, iconTileY, iconTileSize, iconTileSize, Sf(8f), tileBg, tileStroke, 1f);
+            var rcPhotoIcon = new RECT
+            {
+                Left = iconTileX,
+                Top = iconTileY,
+                Right = iconTileX + iconTileSize,
+                Bottom = iconTileY + iconTileSize
+            };
+            TryDrawFluentFontGlyph(hdc, fontIconMedium, FluentIconPhoto, rcPhotoIcon, _theme.AccentDefault);
+
+            // Right WinUI 3 ToggleSwitch (40x20 pill track + sliding circular thumb)
+            int switchW = S(40);
+            int switchH = S(20);
+            int switchRight = _settingsToggleCardRect.Right - S(16);
+            int switchLeft = switchRight - switchW;
+            int switchTop = _settingsToggleCardRect.Top + (_settingsToggleCardRect.Height - switchH) / 2;
 
             if (_appSettings.DownloadArtwork)
             {
                 DrawSmoothRoundedCard(
                     g,
-                    checkX,
-                    checkY,
-                    checkSize,
-                    checkSize,
-                    Sf(4f),
+                    switchLeft,
+                    switchTop,
+                    switchW,
+                    switchH,
+                    switchH / 2f,
                     ToArgb(_theme.AccentDefault),
                     ToArgb(_theme.AccentDefault),
                     1f);
-                DrawVectorCheckmark(
-                    g,
-                    checkX + checkSize / 2f,
-                    checkY + checkSize / 2f,
-                    checkSize,
-                    ToArgb(_theme.TextOnAccent),
-                    Math.Max(1.6f, Sf(1.8f)));
+
+                float thumbD = Sf(12f);
+                float thumbX = switchRight - Sf(4f) - thumbD;
+                float thumbY = switchTop + (switchH - thumbD) / 2f;
+                DrawSmoothCircle(g, thumbX, thumbY, thumbD, ToArgb(_theme.TextOnAccent));
             }
             else
             {
                 DrawSmoothRoundedCard(
                     g,
-                    checkX,
-                    checkY,
-                    checkSize,
-                    checkSize,
-                    Sf(4f),
+                    switchLeft,
+                    switchTop,
+                    switchW,
+                    switchH,
+                    switchH / 2f,
                     ToArgb(_theme.LayerDefault),
-                    ToArgb(_theme.TextTertiary),
+                    ToArgb(_theme.TextSecondary),
                     Math.Max(1.2f, Sf(1.3f)));
+
+                float thumbD = Sf(10f);
+                float thumbX = switchLeft + Sf(5f);
+                float thumbY = switchTop + (switchH - thumbD) / 2f;
+                DrawSmoothCircle(g, thumbX, thumbY, thumbD, ToArgb(_theme.TextSecondary));
             }
 
             SelectObject(hdc, fontBodyStrong);
             SetTextColor(hdc, _theme.TextPrimary);
             var rcToggleText = new RECT
             {
-                Left = checkX + checkSize + S(12),
+                Left = iconTileX + iconTileSize + S(12),
                 Top = _settingsToggleCardRect.Top,
-                Right = _settingsToggleCardRect.Right - S(14),
+                Right = switchLeft - S(12),
                 Bottom = _settingsToggleCardRect.Bottom
             };
             DrawTextW(hdc, _strings.SettingsDownloadToggle, -1, ref rcToggleText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 
             // Card 2: SteamGridDB API Key Card
             int keyCardTop = _settingsToggleCardRect.Bottom + cardGap;
-            int keyCardH = Math.Max(S(88), SF(80));
+            int keyCardH = Math.Max(S(94), SF(84));
             var rcKeyCard = new RECT
             {
                 Left = area.Left,
@@ -3401,15 +3568,16 @@ public static class SyncStatusDialog
                 Sf(8f),
                 ToArgb(_theme.CardDefault),
                 ToArgb(_theme.CardStroke),
-                1f);
+                1f,
+                shadowCol);
 
-            int headerRowTop = rcKeyCard.Top + S(10);
-            int smallBtnH = Math.Max(S(24), SF(22));
+            int headerRowTop = rcKeyCard.Top + S(12);
+            int smallBtnH = Math.Max(S(26), SF(24));
 
-            // Right-aligned mini buttons: [Obtener API Key] [Borrar] [Pegar]
-            int pasteW = Math.Max(S(58), MeasureTextWidth(hdc, fontCaptionStrong, _strings.SettingsPasteButton) + S(20));
-            int clearW = Math.Max(S(58), MeasureTextWidth(hdc, fontCaptionStrong, _strings.SettingsClearButton) + S(20));
-            int getKeyW = Math.Max(S(96), MeasureTextWidth(hdc, fontCaptionStrong, _strings.SettingsGetKeyButton) + S(20));
+            // Right-aligned mini buttons with Fluent Icons: [\uE8A7 Obtener API Key] [\uE74D Borrar] [\uE77F Pegar]
+            int pasteW = Math.Max(S(74), MeasureTextWidth(hdc, fontCaptionStrong, _strings.SettingsPasteButton) + S(36));
+            int clearW = Math.Max(S(74), MeasureTextWidth(hdc, fontCaptionStrong, _strings.SettingsClearButton) + S(36));
+            int getKeyW = Math.Max(S(116), MeasureTextWidth(hdc, fontCaptionStrong, _strings.SettingsGetKeyButton) + S(36));
 
             int pasteRight = rcKeyCard.Right - S(14);
             _btnPasteRect = new RECT
@@ -3438,22 +3606,36 @@ public static class SyncStatusDialog
                 Bottom = headerRowTop + smallBtnH
             };
 
-            DrawFluentButton(hdc, g, _btnGetKeyRect, _strings.SettingsGetKeyButton, false, _hoverGetKey, false, false, fontCaptionStrong);
-            DrawFluentButton(hdc, g, _btnClearKeyRect, _strings.SettingsClearButton, false, _hoverClearKey, false, false, fontCaptionStrong);
-            DrawFluentButton(hdc, g, _btnPasteRect, _strings.SettingsPasteButton, true, _hoverPaste, false, false, fontCaptionStrong);
+            DrawFluentActionChipButton(hdc, g, _btnGetKeyRect, FluentIconExternalLink, _strings.SettingsGetKeyButton, false, _hoverGetKey, fontCaptionStrong, fontIconSmall);
+            DrawFluentActionChipButton(hdc, g, _btnClearKeyRect, FluentIconDelete, _strings.SettingsClearButton, false, _hoverClearKey, fontCaptionStrong, fontIconSmall);
+            DrawFluentActionChipButton(hdc, g, _btnPasteRect, FluentIconPaste, _strings.SettingsPasteButton, true, _hoverPaste, fontCaptionStrong, fontIconSmall);
+
+            // Key Icon + Label on the left of API Key Card Header
+            int keyIconSize = Math.Max(S(26), SF(24));
+            int keyIconX = rcKeyCard.Left + S(14);
+            int keyIconY = headerRowTop + (smallBtnH - keyIconSize) / 2;
+            DrawSmoothRoundedCard(g, keyIconX, keyIconY, keyIconSize, keyIconSize, Sf(6f), tileBg, tileStroke, 1f);
+            var rcKeyGlyph = new RECT
+            {
+                Left = keyIconX,
+                Top = keyIconY,
+                Right = keyIconX + keyIconSize,
+                Bottom = keyIconY + keyIconSize
+            };
+            TryDrawFluentFontGlyph(hdc, fontIconSmall, FluentIconKey, rcKeyGlyph, _theme.AccentDefault);
 
             SelectObject(hdc, fontBodyStrong);
             SetTextColor(hdc, _theme.TextPrimary);
             var rcKeyLabel = new RECT
             {
-                Left = rcKeyCard.Left + S(14),
+                Left = keyIconX + keyIconSize + S(10),
                 Top = headerRowTop,
                 Right = _btnGetKeyRect.Left - S(8),
                 Bottom = headerRowTop + smallBtnH
             };
             DrawTextW(hdc, _strings.SettingsApiKeyLabel, -1, ref rcKeyLabel, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
 
-            // API Key Input Box
+            // WinUI 3 TextBox with Bottom Focus Accent Line
             int boxTop = headerRowTop + smallBtnH + S(10);
             int boxH = Math.Max(S(32), SF(28));
             _apiKeyBoxRect = new RECT
@@ -3464,8 +3646,6 @@ public static class SyncStatusDialog
                 Bottom = boxTop + boxH
             };
 
-            uint boxStroke = _apiKeyInputFocused ? _theme.AccentDefault : _theme.TagStroke;
-            float boxStrokeW = _apiKeyInputFocused ? Math.Max(1.5f, Sf(1.6f)) : 1f;
             DrawSmoothRoundedCard(
                 g,
                 _apiKeyBoxRect.Left,
@@ -3474,8 +3654,20 @@ public static class SyncStatusDialog
                 _apiKeyBoxRect.Height,
                 Sf(4f),
                 ToArgb(_theme.LayerDefault),
-                ToArgb(boxStroke),
-                boxStrokeW);
+                ToArgb(_theme.TagStroke),
+                1f);
+
+            // Signature WinUI 3 bottom accent underline on TextBox focus
+            uint bottomLineCol = _apiKeyInputFocused ? ToArgb(_theme.AccentDefault) : ToArgb(_theme.TextTertiary, 120);
+            float bottomLineW = _apiKeyInputFocused ? Math.Max(2f, Sf(2f)) : 1f;
+            DrawSmoothLine(
+                g,
+                _apiKeyBoxRect.Left + Sf(2f),
+                _apiKeyBoxRect.Bottom - Sf(1f),
+                _apiKeyBoxRect.Right - Sf(2f),
+                _apiKeyBoxRect.Bottom - Sf(1f),
+                bottomLineCol,
+                bottomLineW);
 
             string currentKey = _appSettings.SteamGridDbApiKey ?? string.Empty;
             bool hasKeyText = !string.IsNullOrWhiteSpace(currentKey);
@@ -3490,9 +3682,49 @@ public static class SyncStatusDialog
                 Left = _apiKeyBoxRect.Left + S(10),
                 Top = _apiKeyBoxRect.Top,
                 Right = _apiKeyBoxRect.Right - S(10),
-                Bottom = _apiKeyBoxRect.Bottom
+                Bottom = _apiKeyBoxRect.Bottom - S(2)
             };
             DrawTextW(hdc, displayKey, -1, ref rcBoxText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+        }
+
+        private static void DrawFluentActionChipButton(
+            IntPtr hdc,
+            IntPtr g,
+            RECT rect,
+            string iconGlyph,
+            string label,
+            bool isAccent,
+            bool isHovered,
+            IntPtr fontLabel,
+            IntPtr fontIcon)
+        {
+            uint fillCol = isAccent
+                ? (isHovered ? _theme.AccentHover : _theme.AccentDefault)
+                : (isHovered ? _theme.CardHover : _theme.LayerDefault);
+            uint borderCol = isAccent ? _theme.AccentBorderTop : _theme.TagStroke;
+            uint textCol = isAccent ? _theme.TextOnAccent : _theme.TextPrimary;
+
+            DrawSmoothRoundedCard(g, rect.Left, rect.Top, rect.Width, rect.Height, Sf(5f), ToArgb(fillCol), ToArgb(borderCol), 1f);
+
+            var rcIcon = new RECT
+            {
+                Left = rect.Left + S(6),
+                Top = rect.Top,
+                Right = rect.Left + S(24),
+                Bottom = rect.Bottom
+            };
+            TryDrawFluentFontGlyph(hdc, fontIcon, iconGlyph, rcIcon, textCol);
+
+            SelectObject(hdc, fontLabel);
+            SetTextColor(hdc, textCol);
+            var rcText = new RECT
+            {
+                Left = rcIcon.Right,
+                Top = rect.Top,
+                Right = rect.Right - S(8),
+                Bottom = rect.Bottom
+            };
+            DrawTextW(hdc, label, -1, ref rcText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
         }
 
         private static void DrawControllerHintLegend(
@@ -3506,14 +3738,13 @@ public static class SyncStatusDialog
             IntPtr fontCaption,
             IntPtr fontCaptionStrong)
         {
-            if (_isSettingsView || !hasUnsynced || right - left < S(60))
+            if (_isSettingsView || _gamepadType == GamepadType.Keyboard || !hasUnsynced || right - left < S(60))
                 return;
 
             int cy = (top + bottom) / 2;
             int badgeH = Math.Max(S(18), SF(17));
             int curX = left;
 
-            // 1. Toggle badge + label (e.g. (A) / (✕) / (B) / [Space] Marcar)
             int w1 = DrawInputGlyphBadge(hdc, g, curX, cy, badgeH, InputGlyph.Confirm, false, fontCaptionStrong);
             curX += w1 + S(6);
 
@@ -3533,7 +3764,6 @@ public static class SyncStatusDialog
             DrawTextW(hdc, _strings.HintToggle, -1, ref rcToggle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
             curX += toggleTextW + S(14);
 
-            // 2. Select All badge + label when a gamepad is active (e.g. (Y) / (△) / (X))
             if (_gamepadType != GamepadType.Keyboard)
             {
                 int badge2W = MeasureInputGlyphBadgeWidth(hdc, fontCaptionStrong, badgeH, InputGlyph.SecondaryAction);
@@ -3565,54 +3795,68 @@ public static class SyncStatusDialog
             int right,
             int bottom,
             SteamSyncResult? result,
-            IntPtr fontTitle)
+            IntPtr fontBodyStrong,
+            IntPtr fontCaption,
+            IntPtr fontIconMedium)
         {
             uint bgCol;
             uint borderCol;
-            uint iconCol;
+            uint accentCol;
             bool isError = false;
-            bool showLeftAccentStrip = false;
-            string statusMessage;
+            string statusTitle;
+            string statusSubtitle;
+            string heroGlyph;
 
             int unsyncedCount = GetUnsyncedCount();
 
-            if (result != null && result.Success)
+            if (_isSettingsView)
             {
+                bgCol = _theme.CardDefault;
+                borderCol = _theme.CardStroke;
+                accentCol = _theme.AccentDefault;
+                heroGlyph = FluentIconSettings;
+                statusTitle = _strings.SettingsTitle;
+                statusSubtitle = _strings.SettingsSubtitle;
+            }
+            else if (result != null && result.Success)
+            {
+                bgCol = _theme.CardDefault;
+                borderCol = _theme.CardStroke;
+                accentCol = _theme.AccentDefault;
+
                 if (result.AddedGames.Count > 0 && unsyncedCount == 0)
                 {
-                    bgCol = _theme.SuccessBg;
-                    borderCol = _theme.SuccessBorder;
-                    iconCol = _theme.SuccessIcon;
-                    statusMessage = $"{StripLeadingSymbol(_strings.HeaderSuccess)} ({result.AddedGames.Count})";
+                    heroGlyph = FluentIconCheckMark;
+                    statusTitle = $"{StripLeadingSymbol(_strings.HeaderSuccess)} ({result.AddedGames.Count})";
+                    statusSubtitle = _strings.HeaderSuccessSub;
                 }
                 else if (unsyncedCount > 0)
                 {
-                    bgCol = _theme.InfoBg;
-                    borderCol = _theme.InfoBorder;
-                    iconCol = _theme.InfoIcon;
-                    showLeftAccentStrip = true;
-                    statusMessage = string.Format(_strings.HeaderAvailableToAddFormat, unsyncedCount);
+                    heroGlyph = FluentIconSync;
+                    statusTitle = string.Format(_strings.HeaderAvailableToAddFormat, unsyncedCount);
+                    statusSubtitle = _strings.HeaderPendingSub;
                 }
                 else
                 {
-                    bgCol = _theme.SuccessBg;
-                    borderCol = _theme.SuccessBorder;
-                    iconCol = _theme.SuccessIcon;
-                    statusMessage = StripLeadingSymbol(_strings.HeaderUpToDate);
+                    heroGlyph = FluentIconCheckMark;
+                    statusTitle = StripLeadingSymbol(_strings.HeaderUpToDate);
+                    statusSubtitle = _strings.HeaderUpToDateSub;
                 }
             }
             else
             {
                 bgCol = _theme.CriticalBg;
                 borderCol = _theme.CriticalBorder;
-                iconCol = _theme.CriticalIcon;
+                accentCol = _theme.CriticalIcon;
                 isError = true;
-                statusMessage = StripLeadingSymbol(_strings.HeaderError);
+                heroGlyph = FluentIconErrorBadge;
+                statusTitle = StripLeadingSymbol(_strings.HeaderError);
+                statusSubtitle = result?.ErrorMessage ?? string.Empty;
             }
 
             uint shadowCol = _theme.IsHighContrast
                 ? 0
-                : (_theme.IsLight ? ToArgb(Rgb(0, 0, 0), 10) : ToArgb(Rgb(0, 0, 0), 32));
+                : (_theme.IsLight ? ToArgb(Rgb(0, 0, 0), 8) : ToArgb(Rgb(0, 0, 0), 24));
 
             DrawSmoothRoundedCard(
                 g,
@@ -3626,51 +3870,72 @@ public static class SyncStatusDialog
                 1f,
                 shadowCol);
 
-            if (showLeftAccentStrip && !_theme.IsHighContrast)
-            {
-                float stripW = Math.Max(3f, Sf(3.5f));
-                float stripH = (bottom - top) - Sf(16f);
-                DrawSmoothRoundedCard(
-                    g,
-                    left + Sf(6f),
-                    top + Sf(8f),
-                    stripW,
-                    stripH,
-                    stripW / 2f,
-                    ToArgb(iconCol),
-                    0);
-            }
-
-            int emblemSize = Math.Max(S(26), SF(24));
-            int emblemX = left + S(18);
+            // Refined Circular Status Emblem with Official Segoe Fluent Icon
+            int emblemSize = Math.Max(S(30), SF(26));
+            int emblemX = left + S(14);
             int emblemY = top + (bottom - top - emblemSize) / 2;
 
-            DrawSmoothCircle(g, emblemX, emblemY, emblemSize, ToArgb(iconCol));
+            uint emblemFill = _theme.IsHighContrast
+                ? ToArgb(_theme.TagFill)
+                : (isError
+                    ? ToArgb(_theme.CriticalBorder)
+                    : ToArgb(accentCol, _theme.IsLight ? (byte)22 : (byte)38));
+            uint emblemStroke = _theme.IsHighContrast
+                ? ToArgb(_theme.TagStroke)
+                : (isError
+                    ? ToArgb(_theme.CriticalIcon)
+                    : ToArgb(accentCol, _theme.IsLight ? (byte)50 : (byte)70));
 
-            uint glyphCol = GetRelativeLuminance(iconCol) > 0.55 ? ToArgb(Rgb(0, 0, 0)) : ToArgb(Rgb(255, 255, 255));
-            float cx = emblemX + emblemSize / 2f;
-            float cy = emblemY + emblemSize / 2f;
-            float strokeW = Math.Max(1.8f, Sf(2.0f));
+            DrawSmoothRoundedCard(g, emblemX, emblemY, emblemSize, emblemSize, emblemSize / 2f, emblemFill, emblemStroke, 1f);
 
-            if (isError)
+            var rcEmblem = new RECT
             {
-                DrawVectorCross(g, cx, cy, emblemSize, glyphCol, strokeW);
-            }
-            else
+                Left = emblemX,
+                Top = emblemY,
+                Right = emblemX + emblemSize,
+                Bottom = emblemY + emblemSize
+            };
+
+            if (!TryDrawFluentFontGlyph(hdc, fontIconMedium, heroGlyph, rcEmblem, accentCol))
             {
-                DrawVectorCheckmark(g, cx, cy, emblemSize, glyphCol, strokeW);
+                float cx = emblemX + emblemSize / 2f;
+                float cy = emblemY + emblemSize / 2f;
+                float strokeW = Math.Max(1.8f, Sf(2.0f));
+                if (isError)
+                    DrawVectorCross(g, cx, cy, emblemSize, ToArgb(accentCol), strokeW);
+                else
+                    DrawVectorCheckmark(g, cx, cy, emblemSize, ToArgb(accentCol), strokeW);
             }
 
-            SelectObject(hdc, fontTitle);
+            // Two-Line WinUI 3 InfoBar Layout: Title (BodyStrong 13.5px) + Subtitle (Caption 12px TextSecondary)
+            int textLeft = emblemX + emblemSize + S(12);
+            int textRight = right - S(14);
+            int line1H = SF(18);
+            int line2H = SF(14);
+            int totalTextH = line1H + S(2) + line2H;
+            int textTop = top + (bottom - top - totalTextH) / 2;
+
+            SelectObject(hdc, fontBodyStrong);
             SetTextColor(hdc, _theme.TextPrimary);
             var rcTitle = new RECT
             {
-                Left = emblemX + emblemSize + S(14),
-                Top = top,
-                Right = right - S(16),
-                Bottom = bottom
+                Left = textLeft,
+                Top = textTop,
+                Right = textRight,
+                Bottom = textTop + line1H
             };
-            DrawTextW(hdc, statusMessage, -1, ref rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+            DrawTextW(hdc, statusTitle, -1, ref rcTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+            SelectObject(hdc, fontCaption);
+            SetTextColor(hdc, _theme.TextSecondary);
+            var rcSubtitle = new RECT
+            {
+                Left = textLeft,
+                Top = rcTitle.Bottom + S(2),
+                Right = textRight,
+                Bottom = rcTitle.Bottom + S(2) + line2H
+            };
+            DrawTextW(hdc, statusSubtitle, -1, ref rcSubtitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
         }
 
         private static void DrawGameSettingsCard(
@@ -3684,12 +3949,16 @@ public static class SyncStatusDialog
             bool isHovered,
             bool isFocused,
             IntPtr fontBodyStrong,
-            IntPtr fontCaptionStrong)
+            IntPtr fontCaption,
+            IntPtr fontCaptionStrong,
+            IntPtr fontIconMedium,
+            IntPtr fontIconSmall)
         {
             var game = row.Game;
             bool highlightSurface = isHovered || isFocused;
             uint rowBg = highlightSurface ? _theme.CardHover : _theme.CardDefault;
             uint rowTextCol = (_theme.IsHighContrast && highlightSurface) ? _theme.TextOnAccent : _theme.TextPrimary;
+            uint rowSubCol = (_theme.IsHighContrast && highlightSurface) ? _theme.TextOnAccent : _theme.TextSecondary;
             uint strokeCol = isFocused
                 ? (_theme.IsHighContrast ? _theme.TextOnAccent : _theme.AccentDefault)
                 : _theme.RowStroke;
@@ -3711,7 +3980,7 @@ public static class SyncStatusDialog
                 strokeW,
                 shadowCol);
 
-            // Focused indicator bar on left edge for unmistakable Couch Gaming joystick focus
+            // Focused indicator bar on left edge for Couch Gaming joystick focus
             if (isFocused && !_theme.IsHighContrast)
             {
                 float barW = Math.Max(3f, Sf(3.5f));
@@ -3727,22 +3996,32 @@ public static class SyncStatusDialog
                     0);
             }
 
-            // 1. Left Selection CheckBox (for unsynced games) or Synced Checkmark Badge (for synced games)
+            // 1. Left Selection CheckBox (for unsynced games) or Subtle Accent Check Indicator (for synced games — no neon green blob)
             int checkSize = Math.Max(S(20), SF(18));
             int checkX = left + S(14);
             int checkY = top + (bottom - top - checkSize) / 2;
+            var rcCheck = new RECT { Left = checkX, Top = checkY, Right = checkX + checkSize, Bottom = checkY + checkSize };
 
             if (row.IsSynced)
             {
-                DrawSmoothCircle(g, checkX, checkY, checkSize, ToArgb(_theme.SuccessIcon));
-                uint glyphCol = GetRelativeLuminance(_theme.SuccessIcon) > 0.55 ? ToArgb(Rgb(0, 0, 0)) : ToArgb(Rgb(255, 255, 255));
-                DrawVectorCheckmark(
-                    g,
-                    checkX + checkSize / 2f,
-                    checkY + checkSize / 2f,
-                    checkSize,
-                    glyphCol,
-                    Math.Max(1.6f, Sf(1.8f)));
+                uint syncBoxFill = _theme.IsHighContrast
+                    ? ToArgb(_theme.TagFill)
+                    : ToArgb(_theme.AccentDefault, _theme.IsLight ? (byte)18 : (byte)32);
+                uint syncBoxStroke = _theme.IsHighContrast
+                    ? ToArgb(_theme.TagStroke)
+                    : ToArgb(_theme.AccentDefault, _theme.IsLight ? (byte)48 : (byte)70);
+
+                DrawSmoothRoundedCard(g, checkX, checkY, checkSize, checkSize, Sf(5f), syncBoxFill, syncBoxStroke, 1f);
+                if (!TryDrawFluentFontGlyph(hdc, fontIconSmall, FluentIconCheckMark, rcCheck, _theme.AccentDefault))
+                {
+                    DrawVectorCheckmark(
+                        g,
+                        checkX + checkSize / 2f,
+                        checkY + checkSize / 2f,
+                        checkSize,
+                        ToArgb(_theme.AccentDefault),
+                        Math.Max(1.6f, Sf(1.8f)));
+                }
             }
             else if (row.IsSelected)
             {
@@ -3756,13 +4035,17 @@ public static class SyncStatusDialog
                     ToArgb(_theme.AccentDefault),
                     ToArgb(_theme.AccentDefault),
                     1f);
-                DrawVectorCheckmark(
-                    g,
-                    checkX + checkSize / 2f,
-                    checkY + checkSize / 2f,
-                    checkSize,
-                    ToArgb(_theme.TextOnAccent),
-                    Math.Max(1.6f, Sf(1.8f)));
+
+                if (!TryDrawFluentFontGlyph(hdc, fontIconSmall, FluentIconCheckMark, rcCheck, _theme.TextOnAccent))
+                {
+                    DrawVectorCheckmark(
+                        g,
+                        checkX + checkSize / 2f,
+                        checkY + checkSize / 2f,
+                        checkSize,
+                        ToArgb(_theme.TextOnAccent),
+                        Math.Max(1.6f, Sf(1.8f)));
+                }
             }
             else
             {
@@ -3786,9 +4069,9 @@ public static class SyncStatusDialog
                 ? rowTextCol
                 : GetLauncherColor(game.Launcher, _theme.IsLight);
 
-            // 2. App / Launcher Icon Squircle Tile (32x32)
-            int tileSize = Math.Max(S(32), SF(28));
-            int tileX = checkX + checkSize + S(10);
+            // 2. App / Launcher Icon Squircle Tile (36x36)
+            int tileSize = Math.Max(S(36), SF(32));
+            int tileX = checkX + checkSize + S(12);
             int tileY = top + (bottom - top - tileSize) / 2;
 
             IntPtr hGameIcon = GetOrExtractGameIcon(game);
@@ -3800,9 +4083,9 @@ public static class SyncStatusDialog
                 uint neutralTileStroke = _theme.IsHighContrast
                     ? ToArgb(_theme.TagStroke)
                     : ToArgb(_theme.CardStroke);
-                DrawSmoothRoundedCard(g, tileX, tileY, tileSize, tileSize, Sf(6f), neutralTileBg, neutralTileStroke, 1f);
+                DrawSmoothRoundedCard(g, tileX, tileY, tileSize, tileSize, Sf(8f), neutralTileBg, neutralTileStroke, 1f);
 
-                int icoSize = Math.Max(16, tileSize - S(8));
+                int icoSize = Math.Max(16, tileSize - S(10));
                 int icoX = tileX + (tileSize - icoSize) / 2;
                 int icoY = tileY + (tileSize - icoSize) / 2;
                 DrawIconEx(hdc, icoX, icoY, hGameIcon, icoSize, icoSize, 0, IntPtr.Zero, DI_NORMAL);
@@ -3811,57 +4094,31 @@ public static class SyncStatusDialog
             {
                 uint tileBg = _theme.IsHighContrast
                     ? ToArgb(_theme.TagFill)
-                    : ToArgb(brandColor, _theme.IsLight ? (byte)22 : (byte)36);
+                    : ToArgb(brandColor, _theme.IsLight ? (byte)20 : (byte)34);
                 uint tileStroke = _theme.IsHighContrast
                     ? ToArgb(_theme.TagStroke)
-                    : ToArgb(brandColor, _theme.IsLight ? (byte)48 : (byte)68);
-                DrawSmoothRoundedCard(g, tileX, tileY, tileSize, tileSize, Sf(6f), tileBg, tileStroke, 1f);
-                DrawVectorGamepadGlyph(g, tileX + tileSize / 2f, tileY + tileSize / 2f, tileSize, ToArgb(brandColor));
+                    : ToArgb(brandColor, _theme.IsLight ? (byte)45 : (byte)64);
+                DrawSmoothRoundedCard(g, tileX, tileY, tileSize, tileSize, Sf(8f), tileBg, tileStroke, 1f);
+
+                var rcTileGlyph = new RECT { Left = tileX, Top = tileY, Right = tileX + tileSize, Bottom = tileY + tileSize };
+                if (!TryDrawFluentFontGlyph(hdc, fontIconMedium, FluentIconGamepad, rcTileGlyph, brandColor))
+                {
+                    DrawVectorGamepadGlyph(g, tileX + tileSize / 2f, tileY + tileSize / 2f, tileSize, ToArgb(brandColor));
+                }
             }
 
-            // 3. Right-Aligned Launcher Pill Badge
-            float dotSize = Math.Max(6f, Sf(6f));
-            int launcherTextW = MeasureTextWidth(hdc, fontCaptionStrong, game.Launcher);
-            int tagW = Math.Clamp(S(10) + (int)Math.Ceiling(dotSize) + S(6) + launcherTextW + S(12), S(76), S(148));
-            int tagH = Math.Max(S(24), SF(20));
-            int tagRight = right - S(12);
-            int tagLeft = tagRight - tagW;
-            int tagTop = top + (bottom - top - tagH) / 2;
-            int tagBottom = tagTop + tagH;
-
-            uint badgeFill = _theme.IsHighContrast
-                ? ToArgb(_theme.TagFill)
-                : ToArgb(brandColor, _theme.IsLight ? (byte)20 : (byte)34);
-            uint badgeStroke = _theme.IsHighContrast
-                ? ToArgb(_theme.TagStroke)
-                : ToArgb(brandColor, _theme.IsLight ? (byte)52 : (byte)76);
-
-            DrawSmoothRoundedCard(g, tagLeft, tagTop, tagW, tagH, tagH / 2f, badgeFill, badgeStroke, 1f);
-
-            float dotX = tagLeft + Sf(10f);
-            float dotY = tagTop + (tagH - dotSize) / 2f;
-            DrawSmoothCircle(g, dotX, dotY, dotSize, ToArgb(brandColor));
-
-            SelectObject(hdc, fontCaptionStrong);
-            SetTextColor(hdc, _theme.IsHighContrast ? rowTextCol : brandColor);
-            var rcTagText = new RECT
-            {
-                Left = (int)Math.Round(dotX + dotSize) + S(6),
-                Top = tagTop,
-                Right = tagRight - S(8),
-                Bottom = tagBottom
-            };
-            DrawTextW(hdc, game.Launcher, -1, ref rcTagText, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
-
-            // 4. Sync Status Pill Badge (Sincronizado / Seleccionado / No sincronizado) to the left of Launcher Pill
+            // 3. Single Right-Aligned Status Badge (Neutral/Subtle for Synced, Accent for Selected — No Competing Double Pills)
             string statusText = row.IsSynced
                 ? _strings.BadgeSynced
                 : (row.IsSelected ? _strings.BadgeSelected : _strings.BadgeNotSynced);
 
             int statusTextW = MeasureTextWidth(hdc, fontCaptionStrong, statusText);
-            int statusW = statusTextW + S(18);
-            int statusRight = tagLeft - S(8);
+            int statusW = statusTextW + S(20);
+            int tagH = Math.Max(S(24), SF(20));
+            int statusRight = right - S(14);
             int statusLeft = statusRight - statusW;
+            int tagTop = top + (bottom - top - tagH) / 2;
+            int tagBottom = tagTop + tagH;
 
             uint statusFill;
             uint statusStroke;
@@ -3875,9 +4132,10 @@ public static class SyncStatusDialog
             }
             else if (row.IsSynced)
             {
-                statusFill = ToArgb(_theme.SuccessBg);
-                statusStroke = ToArgb(_theme.SuccessBorder);
-                statusTextCol = _theme.SuccessIcon;
+                // Understated WinUI 3 neutral pill (zero green saturation)
+                statusFill = ToArgb(_theme.TagFill);
+                statusStroke = ToArgb(_theme.CardStroke);
+                statusTextCol = _theme.TextSecondary;
             }
             else if (row.IsSelected)
             {
@@ -3887,9 +4145,9 @@ public static class SyncStatusDialog
             }
             else
             {
-                statusFill = ToArgb(_theme.TagFill);
+                statusFill = ToArgb(_theme.LayerDefault);
                 statusStroke = ToArgb(_theme.TagStroke);
-                statusTextCol = _theme.TextSecondary;
+                statusTextCol = _theme.TextTertiary;
             }
 
             DrawSmoothRoundedCard(g, statusLeft, tagTop, statusW, tagH, tagH / 2f, statusFill, statusStroke, 1f);
@@ -3898,24 +4156,49 @@ public static class SyncStatusDialog
             SetTextColor(hdc, statusTextCol);
             var rcStatusText = new RECT
             {
-                Left = statusLeft + S(6),
+                Left = statusLeft + S(8),
                 Top = tagTop,
-                Right = statusRight - S(6),
+                Right = statusRight - S(8),
                 Bottom = tagBottom
             };
             DrawTextW(hdc, statusText, -1, ref rcStatusText, DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX);
 
-            // 5. Vertically Centered Game Title
+            // 4. Center Two-Line SettingsCard Hierarchy: Game Title (Top) + Brand Dot & Launcher Name (Bottom)
+            int textLeft = tileX + tileSize + S(12);
+            int textRight = statusLeft - S(12);
+            int line1H = SF(19);
+            int line2H = SF(15);
+            int totalTextH = line1H + S(2) + line2H;
+            int textTop = top + (bottom - top - totalTextH) / 2;
+
             SelectObject(hdc, fontBodyStrong);
             SetTextColor(hdc, rowTextCol);
             var rcGameTitle = new RECT
             {
-                Left = tileX + tileSize + S(12),
-                Top = top,
-                Right = statusLeft - S(10),
-                Bottom = bottom
+                Left = textLeft,
+                Top = textTop,
+                Right = textRight,
+                Bottom = textTop + line1H
             };
             DrawTextW(hdc, game.Title, -1, ref rcGameTitle, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
+
+            // Secondary Metadata Line: Subtle Launcher Brand Dot + Launcher Name
+            int subTop = rcGameTitle.Bottom + S(2);
+            float dotSize = Math.Max(5f, Sf(5.5f));
+            float dotX = textLeft + Sf(1f);
+            float dotY = subTop + (line2H - dotSize) / 2f;
+            DrawSmoothCircle(g, dotX, dotY, dotSize, ToArgb(brandColor));
+
+            SelectObject(hdc, fontCaption);
+            SetTextColor(hdc, rowSubCol);
+            var rcLauncherSub = new RECT
+            {
+                Left = (int)Math.Round(dotX + dotSize) + S(6),
+                Top = subTop,
+                Right = textRight,
+                Bottom = subTop + line2H
+            };
+            DrawTextW(hdc, game.Launcher, -1, ref rcLauncherSub, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
         }
 
         private static void DrawFluentScrollbar(IntPtr g, int left, int top, int right, int bottom, int totalItems)
@@ -4036,6 +4319,21 @@ public static class SyncStatusDialog
                 hFont = CreateFontW(
                     pixelHeight, 0, 0, 0, weight,
                     0, 0, 0, 1, 0, 0, 5, 0, "Segoe UI");
+            }
+            return hFont;
+        }
+
+        private static IntPtr CreateFluentIconFont(int pixelHeight)
+        {
+            IntPtr hFont = CreateFontW(
+                pixelHeight, 0, 0, 0, 400,
+                0, 0, 0, 1, 0, 0, 5, 0, "Segoe Fluent Icons");
+
+            if (hFont == IntPtr.Zero)
+            {
+                hFont = CreateFontW(
+                    pixelHeight, 0, 0, 0, 400,
+                    0, 0, 0, 1, 0, 0, 5, 0, "Segoe MDL2 Assets");
             }
             return hFont;
         }

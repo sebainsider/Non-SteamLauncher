@@ -12,6 +12,9 @@ public class AppSettings
     [JsonPropertyName("downloadArtwork")]
     public bool DownloadArtwork { get; set; } = true;
 
+    [JsonPropertyName("language")]
+    public string? Language { get; set; } = "es";
+
     public static string GetDefaultSettingsFilePath()
     {
         try

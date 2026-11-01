@@ -32,13 +32,50 @@ public class LocalizedStrings
     public string SettingsClearButton { get; init; } = "";
     public string SettingsGetKeyButton { get; init; } = "";
     public string SettingsSaveBackButton { get; init; } = "";
+    public string HeaderUpToDateSub { get; init; } = "All detected games are synced and ready to play in Steam.";
+    public string HeaderPendingSub { get; init; } = "Select the games you want to add to your Steam library.";
+    public string HeaderSuccessSub { get; init; } = "Shortcuts have been successfully saved to Steam.";
+    public string SettingsSubtitle { get; init; } = "Configure automatic artwork, banner, and logo downloads.";
+    public string TabLibrary { get; init; } = "Library";
+    public string TabSettings { get; init; } = "SteamGridDB";
+    public string SettingsDownloadToggleSub { get; init; } = "Fetch covers, heroes, logos, and icons from SteamGridDB for your games.";
+    public string SettingsApiKeySub { get; init; } = "Enter your personal API key to enable automated downloads.";
+    public string GamepadHintXbox { get; init; } = "(A) Toggle  (X) Sync  (Y) All  (B) Close  (LB/RB) Tabs";
+    public string GamepadHintPlayStation { get; init; } = "(✕) Toggle  (▢) Sync  (△) All  (○) Close  (L1/R1) Tabs";
+    public string KeyboardHintLegend { get; init; } = "[Tab] Tabs   [Space] Select   [Enter] Confirm   [Esc] Close";
+    public string InputDeviceKeyboard { get; init; } = "Keyboard & Mouse";
+    public string InputDeviceXbox { get; init; } = "Xbox Controller";
+    public string InputDevicePlayStation { get; init; } = "PlayStation Controller";
+    public string InputDeviceNintendo { get; init; } = "Nintendo Controller";
+    public string ActionHintToggle { get; init; } = "Toggle";
+    public string BadgeReadyToAdd { get; init; } = "Ready to add";
+    public string TabArtwork { get; init; } = "Artwork";
+    public string StatusInSteam { get; init; } = "In Steam";
+    public string StatusReadyToSync { get; init; } = "Ready to sync";
+    public string HeaderUpToDateCompact { get; init; } = "Your Steam library is up to date ({0} games synced)";
+    public string HeaderPendingCompact { get; init; } = "{0} game(s) available to sync with Steam";
+    public string LegendTabs { get; init; } = "Tabs";
+    public string LegendToggle { get; init; } = "Select";
+    public string LegendSync { get; init; } = "Sync";
+    public string LegendClose { get; init; } = "Close";
+    public string LegendAll { get; init; } = "All";
+    public string KeyNameSpace { get; init; } = "Space";
+    public string KeyNameTab { get; init; } = "Tab";
+    public string KeyNameEnter { get; init; } = "Enter";
+    public string KeyNameEsc { get; init; } = "Esc";
+    public string SettingsLanguageLabel { get; init; } = "Language";
+    public string ArtworkProviderTitle { get; init; } = "Artwork Downloads (SteamGridDB)";
+    public string ArtworkProviderDesc { get; init; } = "Automatically download boxart covers, banners, logos, and icons for each game.";
 }
 
 public static class Localization
 {
-    public static LocalizedStrings GetStrings()
+    public static LocalizedStrings GetStrings(string? overrideLang = null)
     {
-        string lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant();
+        string lang = !string.IsNullOrWhiteSpace(overrideLang)
+            ? overrideLang.Trim().ToLowerInvariant()
+            : CultureInfo.CurrentUICulture.TwoLetterISOLanguageName.ToLowerInvariant();
+
         return lang switch
         {
             "es" => Spanish,
@@ -82,7 +119,41 @@ public static class Localization
         SettingsPasteButton = "Pegar",
         SettingsClearButton = "Borrar",
         SettingsGetKeyButton = "Obtener API Key",
-        SettingsSaveBackButton = "Guardar y volver"
+        SettingsSaveBackButton = "Guardar y volver",
+        HeaderUpToDateSub = "Todos tus juegos están agregados y listos para jugar en Steam.",
+        HeaderPendingSub = "Marca los juegos que desees agregar a tu biblioteca de Steam.",
+        HeaderSuccessSub = "Los accesos directos han sido guardados correctamente en Steam.",
+        SettingsSubtitle = "Configura la descarga automática de portadas, banners y logos.",
+        TabLibrary = "Biblioteca",
+        TabSettings = "SteamGridDB",
+        SettingsDownloadToggleSub = "Obtener portadas, banners, logos e iconos de SteamGridDB para tus juegos.",
+        SettingsApiKeySub = "Introduce tu clave de API personal para habilitar las descargas.",
+        GamepadHintXbox = "(A) Marcar   (X) Sincronizar   (Y) Todos   (B) Cerrar   (LB/RB) Pestañas",
+        GamepadHintPlayStation = "(✕) Marcar   (▢) Sincronizar   (△) Todos   (○) Cerrar   (L1/R1) Pestañas",
+        KeyboardHintLegend = "[Tab] Pestañas   •   [Espacio] Marcar   •   [Enter] Sincronizar   •   [Esc] Cerrar",
+        InputDeviceKeyboard = "Teclado y ratón",
+        InputDeviceXbox = "Mando Xbox",
+        InputDevicePlayStation = "Mando PlayStation",
+        InputDeviceNintendo = "Mando Nintendo",
+        ActionHintToggle = "Alternar",
+        BadgeReadyToAdd = "Por agregar",
+        TabArtwork = "Carátulas",
+        StatusInSteam = "En Steam",
+        StatusReadyToSync = "Por sincronizar",
+        HeaderUpToDateCompact = "Tu biblioteca de Steam está al día ({0} juegos sincronizados)",
+        HeaderPendingCompact = "{0} juego(s) disponibles para sincronizar con Steam",
+        LegendTabs = "Pestañas",
+        LegendToggle = "Marcar",
+        LegendSync = "Sincronizar",
+        LegendClose = "Cerrar",
+        LegendAll = "Todos",
+        KeyNameSpace = "Espacio",
+        KeyNameTab = "Tab",
+        KeyNameEnter = "Enter",
+        KeyNameEsc = "Esc",
+        SettingsLanguageLabel = "Idioma",
+        ArtworkProviderTitle = "Descarga de carátulas e imágenes",
+        ArtworkProviderDesc = "Configura SteamGridDB para descargar portadas verticales, banners, logos e iconos automáticamente."
     };
 
     private static readonly LocalizedStrings English = new()
@@ -107,14 +178,48 @@ public static class Localization
         HintAdd = "Add",
         HintSelectAll = "All",
         SettingsButton = "SteamGridDB",
-        SettingsTitle = "Artwork & Icons (SteamGridDB)",
-        SettingsDownloadToggle = "Automatically download covers, heroes, logos, and icons",
+        SettingsTitle = "Artwork & Images",
+        SettingsDownloadToggle = "Automatically download artwork",
         SettingsApiKeyLabel = "SteamGridDB API Key",
         SettingsApiKeyPlaceholder = "Click Paste or type your API Key here...",
         SettingsPasteButton = "Paste",
         SettingsClearButton = "Clear",
         SettingsGetKeyButton = "Get API Key",
-        SettingsSaveBackButton = "Save & Back"
+        SettingsSaveBackButton = "Save & Back",
+        HeaderUpToDateSub = "All detected games are synced and ready to play in Steam.",
+        HeaderPendingSub = "Select the games you want to add to your Steam library.",
+        HeaderSuccessSub = "Shortcuts have been successfully saved to Steam.",
+        SettingsSubtitle = "Configure automatic artwork, banner, and logo downloads.",
+        TabLibrary = "Library",
+        TabSettings = "Artwork",
+        SettingsDownloadToggleSub = "Fetch covers, heroes, logos, and icons from SteamGridDB for your games.",
+        SettingsApiKeySub = "Enter your personal API key to enable automated downloads.",
+        GamepadHintXbox = "(A) Select   (X) Sync   (Y) All   (B) Close   (LB/RB) Tabs",
+        GamepadHintPlayStation = "(✕) Select   (▢) Sync   (△) All   (○) Close   (L1/R1) Tabs",
+        KeyboardHintLegend = "[Tab] Tabs   •   [Space] Select   •   [Enter] Sync   •   [Esc] Close",
+        InputDeviceKeyboard = "Keyboard & Mouse",
+        InputDeviceXbox = "Xbox Controller",
+        InputDevicePlayStation = "PlayStation Controller",
+        InputDeviceNintendo = "Nintendo Controller",
+        ActionHintToggle = "Select",
+        BadgeReadyToAdd = "Ready to add",
+        TabArtwork = "Artwork",
+        StatusInSteam = "In Steam",
+        StatusReadyToSync = "Ready to sync",
+        HeaderUpToDateCompact = "Your Steam library is up to date ({0} games synced)",
+        HeaderPendingCompact = "{0} game(s) available to sync with Steam",
+        LegendTabs = "Tabs",
+        LegendToggle = "Select",
+        LegendSync = "Sync",
+        LegendClose = "Close",
+        LegendAll = "All",
+        KeyNameSpace = "Space",
+        KeyNameTab = "Tab",
+        KeyNameEnter = "Enter",
+        KeyNameEsc = "Esc",
+        SettingsLanguageLabel = "Language",
+        ArtworkProviderTitle = "Artwork & Images Downloads",
+        ArtworkProviderDesc = "Configure SteamGridDB to automatically download vertical covers, banners, logos, and icons."
     };
 
     private static readonly LocalizedStrings Portuguese = new()

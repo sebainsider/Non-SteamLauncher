@@ -1,8 +1,8 @@
 # Non-Steam Launcher 🚀
 
 <p align="center">
-  <img src="NonSteamLauncher/icon.png" width="128" alt="Non-Steam Launcher Icon" /><br>
-  <strong>v1.8.1</strong><br>
+  <img src="NonSteamLauncher/Assets/Icons/NonSteamLauncher.png" width="128" alt="Non-Steam Launcher Icon" /><br>
+  <strong>v1.9.0</strong><br>
   <em>El puente perfecto entre launchers de terceros y Steam.</em>
 </p>
 
@@ -11,9 +11,13 @@
   <a href="README.es.md"><strong>Español</strong></a>
 </p>
 
+<p align="center">
+  <img src="docs/images/ui-preview.png" alt="Vista previa de la interfaz de Non-Steam Launcher" width="750" />
+</p>
+
 ---
 
-**Non-Steam Launcher** es una utilidad ligera y sin dependencias para Windows (.NET 9) que detecta y sincroniza automáticamente tus juegos instalados en plataformas de terceros (**Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy y Xbox / PC Game Pass**) directamente en tu biblioteca de **Steam**, incluyendo carátulas y arte oficial.
+**Non-Steam Launcher** es una utilidad ligera para Windows (.NET 9) que detecta y sincroniza automáticamente tus juegos instalados en plataformas de terceros (**Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy y Xbox / PC Game Pass**) directamente en tu biblioteca de **Steam**, incluyendo carátulas y arte oficial.
 
 Además, resuelve el clásico problema de seguimiento de tiempo de juego en Steam monitoreando el proceso real del juego en lugar del cliente de fondo.
 
@@ -27,6 +31,14 @@ Además, resuelve el clásico problema de seguimiento de tiempo de juego en Stea
 - 🧠 **Smart Auto-Detect**: Detecta el proceso real del juego ignorando lanzadores en segundo plano (`EpicGamesLauncher`, `EADesktop`, `UbisoftConnect`, etc.).
 - ⏱️ **Seguimiento Preciso de Tiempo de Juego**: Steam registra tus horas de juego reales y actualiza tu estado "En juego" correctamente.
 - 🛡️ **No invasivo y seguro**: Realiza copia de seguridad automática de `shortcuts.vdf` antes de escribir y conserva tus accesos directos existentes.
+
+---
+
+## 📸 Captura de la Interfaz
+
+<p align="center">
+  <img src="docs/images/ui-preview.png" alt="Interfaz de Sincronización y Configuración" width="800" />
+</p>
 
 ---
 
