@@ -11,33 +11,10 @@
   <a href="README.es.md"><strong>Español</strong></a>
 </p>
 
-<p align="center">
-  <img src="docs/images/ui-preview.png" alt="Vista previa de la interfaz de Non-Steam Launcher" width="750" />
-</p>
-
----
-
-**Non-Steam Launcher** es una utilidad ligera para Windows (.NET 9) que detecta y sincroniza automáticamente tus juegos instalados en plataformas de terceros (**Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy y Xbox / PC Game Pass**) directamente en tu biblioteca de **Steam**, incluyendo carátulas y arte oficial.
-
-Además, resuelve el clásico problema de seguimiento de tiempo de juego en Steam monitoreando el proceso real del juego en lugar del cliente de fondo.
-
----
-
-## ✨ Características Principales
-
-- 🛋️ **Couch Gaming (Sincronización en 1 Clic)**: Haz doble clic en el `.exe` para escanear y sincronizar todos tus juegos en Steam.
-- 🎨 **Carátulas e Iconos con SteamGridDB**: Descarga automática de covers verticales, banners/heroes, logos e iconos directo a las carpetas de Steam.
-- 🖼️ **Interfaz Nativa Fluent 2**: Diálogo moderno adaptativo al tema de Windows (Claro/Oscuro), color de acento y soporte nativo para gamepad/mando (Xbox, PlayStation).
-- 🧠 **Smart Auto-Detect**: Detecta el proceso real del juego ignorando lanzadores en segundo plano (`EpicGamesLauncher`, `EADesktop`, `UbisoftConnect`, etc.).
-- ⏱️ **Seguimiento Preciso de Tiempo de Juego**: Steam registra tus horas de juego reales y actualiza tu estado "En juego" correctamente.
-- 🛡️ **No invasivo y seguro**: Realiza copia de seguridad automática de `shortcuts.vdf` antes de escribir y conserva tus accesos directos existentes.
-
----
-
 ## 📸 Captura de la Interfaz
 
 <p align="center">
-  <img src="docs/images/ui-preview.png" alt="Interfaz de Sincronización y Configuración" width="800" />
+  <img src="docs/images/non-steam-launcher-ui.png" alt="Interfaz de Non-Steam Launcher" width="760" />
 </p>
 
 ---

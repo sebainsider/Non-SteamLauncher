@@ -11,33 +11,10 @@
   <a href="README.es.md"><strong>Español</strong></a>
 </p>
 
-<p align="center">
-  <img src="docs/images/ui-preview.png" alt="Non-Steam Launcher UI Preview" width="750" />
-</p>
-
----
-
-**Non-Steam Launcher** is a lightweight .NET 9 Windows utility that automatically detects and syncs games installed across third-party launchers (**Epic Games Store, EA App, Ubisoft Connect, Battle.net, GOG Galaxy, and Xbox / PC Game Pass**) directly into your **Steam** library, complete with artwork.
-
-It also solves Steam's playtime tracking issue by monitoring the real game process instead of the background launcher client.
-
----
-
-## ✨ Key Features
-
-- 🛋️ **Couch Gaming (1-Click Sync)**: Just double-click the `.exe` to scan and sync all your games to Steam.
-- 🎨 **Automated Artwork via SteamGridDB**: Automatically fetches grid covers, hero banners, logos, and icons into Steam's grid folders.
-- 🖼️ **Fluent 2 Native UI**: Modern Windows 11 design adaptive to system Light/Dark theme, system accent colors, and native gamepad navigation (Xbox / PlayStation).
-- 🧠 **Smart Auto-Detect**: Distinguishes the real game executable from launcher background processes (`EpicGamesLauncher`, `EADesktop`, `UbisoftConnect`, etc.).
-- ⏱️ **Accurate Playtime Tracking**: Keeps Steam's "In-Game" status active until you actually exit the game, ensuring correct play hours.
-- 🛡️ **Safe & Non-Destructive**: Backs up `shortcuts.vdf` before writing and preserves all existing custom shortcuts.
-
----
-
 ## 📸 Interface Preview
 
 <p align="center">
-  <img src="docs/images/ui-preview.png" alt="Library Sync and Settings UI" width="800" />
+  <img src="docs/images/non-steam-launcher-ui.png" alt="Non-Steam Launcher UI" width="760" />
 </p>
 
 ---
