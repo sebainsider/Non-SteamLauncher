@@ -340,6 +340,129 @@ public class ProcessTrackerTests
         Assert.Equal(0, exitCode);
         Assert.True(provider.KillOverlayCalled);
     }
+
+    [Fact]
+    public async Task RunAsync_DirectExe_ExitsCleanlyEvenWhenBackgroundAppsSpawnAndStayRunning()
+    {
+        var provider = new MockProcessProvider();
+
+        var initialProcs = new List<ProcessInfo>
+        {
+            new(10, "system"),
+            new(20, "GalaxyClient")
+        };
+
+        var duringGameProcs = new List<ProcessInfo>
+        {
+            new(10, "system"),
+            new(20, "GalaxyClient"),
+            new(100, "witcher3"),
+            new(200, "GameBar"),
+            new(201, "XboxGameBarWidgets"),
+            new(202, "RuntimeBroker"),
+            new(203, "msedge"),
+            new(204, "nvngx_update"),
+            new(205, "FileCoAuth"),
+            new(206, "git")
+        };
+
+        provider.SnapshotsToReturn = new List<ProcessSnapshot>
+        {
+            new(initialProcs),
+            new(duringGameProcs)
+        };
+
+        provider.InstanceCounts["witcher3"] = 1;
+        provider.InstanceCounts["GameBar"] = 1;
+        provider.InstanceCounts["XboxGameBarWidgets"] = 1;
+        provider.InstanceCounts["RuntimeBroker"] = 1;
+        provider.InstanceCounts["msedge"] = 1;
+
+        var tracker = new ProcessTracker(provider, _logger);
+        var options = new Options
+        {
+            LaunchCommand = @"C:\Games\The Witcher 3 Wild Hunt GOTY\bin\x64_dx12\witcher3.exe",
+            CloseLauncher = true,
+            DisableOverlay = true,
+            SyncDelaySeconds = 0,
+            TimeoutSeconds = 5
+        };
+
+        var trackerTask = tracker.RunAsync(options);
+        await Task.Delay(600);
+
+        // Witcher 3 exits, while GameBar, RuntimeBroker, msedge remain running
+        provider.InstanceCounts["witcher3"] = 0;
+
+        int exitCode = await trackerTask;
+
+        Assert.Equal(0, exitCode);
+        // Direct DRM-free .exe must NOT close GOG Galaxy or any other open launchers
+        Assert.False(provider.CloseLauncherCalled);
+    }
+
+    [Fact]
+    public async Task RunAsync_WithoutCloseLauncherFlag_DoesNotCloseLauncher()
+    {
+        var provider = new MockProcessProvider();
+        provider.InstanceCounts["AlanWake2"] = 1;
+
+        var tracker = new ProcessTracker(provider, _logger);
+        var options = new Options
+        {
+            LaunchCommand = "com.epicgames.launcher://apps/Item?action=launch",
+            ProcessName = "AlanWake2",
+            CloseLauncher = false,
+            SyncDelaySeconds = 0,
+            TimeoutSeconds = 5
+        };
+
+        var trackerTask = tracker.RunAsync(options);
+        await Task.Delay(600);
+        provider.InstanceCounts["AlanWake2"] = 0;
+
+        int exitCode = await trackerTask;
+
+        Assert.Equal(0, exitCode);
+        Assert.False(provider.CloseLauncherCalled);
+    }
+
+    [Fact]
+    public void GetLauncherProcessNames_MatchesOnlySpecificLauncher_AndEmptyForDirectExe()
+    {
+        var epicProcs = DefaultProcessProvider.GetLauncherProcessNames("com.epicgames.launcher://apps/Item?action=launch");
+        Assert.Contains("EpicGamesLauncher", epicProcs);
+        Assert.DoesNotContain("GalaxyClient", epicProcs);
+        Assert.DoesNotContain("EADesktop", epicProcs);
+
+        var eaProcs = DefaultProcessProvider.GetLauncherProcessNames("origin2://game/launch?offerIds=123");
+        Assert.Contains("EADesktop", eaProcs);
+        Assert.DoesNotContain("EpicGamesLauncher", eaProcs);
+        Assert.DoesNotContain("GalaxyClient", eaProcs);
+
+        var gogUriProcs = DefaultProcessProvider.GetLauncherProcessNames("goggalaxy://openGameView/1495134320");
+        Assert.Contains("GalaxyClient", gogUriProcs);
+        Assert.DoesNotContain("EpicGamesLauncher", gogUriProcs);
+
+        // Direct DRM-free executables should never close any launcher (including paths containing "ea" like Dead Space)
+        Assert.Empty(DefaultProcessProvider.GetLauncherProcessNames(@"C:\Games\The Witcher 3 Wild Hunt GOTY\bin\x64_dx12\witcher3.exe"));
+        Assert.Empty(DefaultProcessProvider.GetLauncherProcessNames(@"C:\Games\Dead Space\DeadSpace.exe"));
+
+        // Smart LaunchOptions builder
+        Assert.Contains("--close-launcher", NonSteamLauncher.Sync.Steam.SteamSyncService.BuildLaunchOptions("com.epicgames.launcher://apps/Item?action=launch"));
+        Assert.DoesNotContain("--close-launcher", NonSteamLauncher.Sync.Steam.SteamSyncService.BuildLaunchOptions(@"C:\Games\The Witcher 3 Wild Hunt GOTY\bin\x64_dx12\witcher3.exe"));
+    }
+
+    [Theory]
+    [InlineData(@"C:\Games\The Witcher 3 Wild Hunt GOTY\bin\x64_dx12\witcher3.exe", "witcher3")]
+    [InlineData(@"""C:\Games\Cyberpunk 2077\bin\x64\Cyberpunk2077.exe""", "Cyberpunk2077")]
+    [InlineData("com.epicgames.launcher://apps/Item?action=launch", null)]
+    [InlineData(@"C:\Games\The Witcher 3\REDprelauncher.exe", null)]
+    [InlineData(@"C:\Games\SomeGame\GameLauncher.exe", null)]
+    public void InferTargetProcessName_ReturnsExpectedProcessName(string command, string? expected)
+    {
+        Assert.Equal(expected, ProcessTracker.InferTargetProcessName(command));
+    }
 }
 
 

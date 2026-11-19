@@ -1,0 +1,335 @@
+<Window x:Class="NonSteamLauncher.Sync.UI.ArtworkPickerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Elegir carátulas"
+        Width="900" MinWidth="720"
+        Height="620" MinHeight="500"
+        WindowStartupLocation="CenterOwner"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType"
+        FontFamily="Segoe UI Variable Text, Segoe UI, sans-serif"
+        FontSize="14"
+        Background="Transparent">
+
+    <Window.Resources>
+        <!-- Fluent 2 Piece Tab Button Style -->
+        <Style x:Key="PieceTabStyle" TargetType="RadioButton">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="TabBorder" CornerRadius="6" Padding="12,0" Background="Transparent" BorderThickness="1" BorderBrush="Transparent">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource AccentTintBrush}"/>
+                                <Setter TargetName="TabBorder" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Primary Accent Button Style -->
+        <Style x:Key="PickerAccentButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder" CornerRadius="6" Background="{DynamicResource AccentBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextOnAccentBrush}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource AccentHoverBrush}"/>
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource AccentPressedBrush}"/>
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource AccentPressedBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Secondary Button Style -->
+        <Style x:Key="PickerSecondaryButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="Padding" Value="14,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder" CornerRadius="6" Background="{DynamicResource CardBrush}" BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource LayerBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="BtnBorder" Property="Opacity" Value="0.45"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid Background="{DynamicResource BackgroundBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/> <!-- Header + Game Selector -->
+            <RowDefinition Height="Auto"/> <!-- Piece Type Tabs -->
+            <RowDefinition Height="*"/>    <!-- 4 Options Grid -->
+            <RowDefinition Height="Auto"/> <!-- Footer Bar -->
+        </Grid.RowDefinitions>
+
+        <!-- 1. Header & Game Switcher (24px Fluent 2 Dialog Margin) -->
+        <Border Grid.Row="0" Padding="24,20,24,12">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Title & Subtitle -->
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0">
+                        <TextBlock x:Name="TxtTitle" Text="Elegir carátulas"
+                                   FontFamily="Segoe UI Variable Display, Segoe UI, sans-serif"
+                                   FontSize="20" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"/>
+                        <TextBlock x:Name="TxtSubtitle" Text="Elige tu opción favorita para cada pieza (4 mejores opciones)"
+                                   FontSize="12" Margin="0,2,0,0"
+                                   Foreground="{DynamicResource TextSecondaryBrush}"/>
+                    </StackPanel>
+
+                    <!-- Multi-game stepper (Visible when > 1 game) -->
+                    <Border x:Name="PanelGameStepper" Grid.Column="1" CornerRadius="6"
+                            Background="{DynamicResource LayerBrush}"
+                            BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                            Padding="4" Margin="0,0,10,0" VerticalAlignment="Center" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button x:Name="BtnPrevGame" Width="28" Height="28" Padding="0"
+                                    Style="{StaticResource PickerSecondaryButtonStyle}"
+                                    Click="BtnPrevGame_Click">
+                                <TextBlock Text="&#xE76B;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" FontSize="11"/>
+                            </Button>
+                            <TextBlock x:Name="TxtGameProgress" Text="Juego 1 de 2"
+                                       FontSize="12" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       VerticalAlignment="Center" Margin="12,0"/>
+                            <Button x:Name="BtnNextGame" Width="28" Height="28" Padding="0"
+                                    Style="{StaticResource PickerSecondaryButtonStyle}"
+                                    Click="BtnNextGame_Click">
+                                <TextBlock Text="&#xE76C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" FontSize="11"/>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Active Input Device Pill -->
+                    <Border Grid.Column="2" CornerRadius="12" Background="{DynamicResource LayerBrush}"
+                            BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                            Padding="10,4" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="IconActiveDevice" Text="&#xE765;"
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif"
+                                       FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"/>
+                            <TextBlock x:Name="TxtActiveDevice" Text="Teclado y ratón"
+                                       FontSize="11.5" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Current Game Info Card -->
+                <Border Grid.Row="1" Margin="0,12,0,0" CornerRadius="8"
+                        Background="{DynamicResource CardBrush}"
+                        BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                        Padding="14,10">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="&#xE7FC;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif"
+                                       FontSize="15" Foreground="{DynamicResource AccentBrush}"
+                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+                            <TextBlock x:Name="TxtGameTitle" Text="Game Title"
+                                       FontSize="14" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <Border Grid.Column="1" CornerRadius="4"
+                                Background="{DynamicResource LayerBrush}"
+                                BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                                Padding="8,2" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtGameLauncher" Text="Epic Games"
+                                       FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"/>
+                        </Border>
+                    </Grid>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- 2. Artwork Piece Tabs + Skip Piece Control -->
+        <Border Grid.Row="1" Padding="24,0,24,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" CornerRadius="8"
+                        Background="{DynamicResource LayerBrush}"
+                        BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                        Padding="4" HorizontalAlignment="Left">
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="TabPoster" GroupName="ArtworkPieces" Style="{StaticResource PieceTabStyle}" IsChecked="True" Checked="PieceTab_Checked" Tag="Poster">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="IconTabPoster" Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtTabPoster" Text="Portada" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="CountTabPoster" Text="(4)" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton x:Name="TabWide" GroupName="ArtworkPieces" Style="{StaticResource PieceTabStyle}" Margin="4,0,0,0" Checked="PieceTab_Checked" Tag="Wide">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="IconTabWide" Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtTabWide" Text="Banner ancho" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="CountTabWide" Text="(4)" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton x:Name="TabHero" GroupName="ArtworkPieces" Style="{StaticResource PieceTabStyle}" Margin="4,0,0,0" Checked="PieceTab_Checked" Tag="Hero">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="IconTabHero" Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtTabHero" Text="Fondo (Hero)" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="CountTabHero" Text="(4)" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton x:Name="TabLogo" GroupName="ArtworkPieces" Style="{StaticResource PieceTabStyle}" Margin="4,0,0,0" Checked="PieceTab_Checked" Tag="Logo">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="IconTabLogo" Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtTabLogo" Text="Logo" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="CountTabLogo" Text="(4)" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton x:Name="TabIcon" GroupName="ArtworkPieces" Style="{StaticResource PieceTabStyle}" Margin="4,0,0,0" Checked="PieceTab_Checked" Tag="Icon">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock x:Name="IconTabIcon" Text="&#xE73E;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" FontSize="11" Foreground="{DynamicResource AccentBrush}" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtTabIcon" Text="Icono" FontSize="12.5" FontWeight="SemiBold" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="CountTabIcon" Text="(4)" FontSize="11" Foreground="{DynamicResource TextTertiaryBrush}" Margin="4,0,0,0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </RadioButton>
+                    </StackPanel>
+                </Border>
+
+                <!-- Skip This Piece Toggle -->
+                <CheckBox x:Name="ChkSkipPiece" Grid.Column="1" VerticalAlignment="Center"
+                          Cursor="Hand" Margin="12,0,0,0"
+                          Foreground="{DynamicResource TextSecondaryBrush}"
+                          FontSize="12.5"
+                          Checked="ChkSkipPiece_Changed" Unchecked="ChkSkipPiece_Changed">
+                    <TextBlock x:Name="TxtSkipPiece" Text="Omitir esta pieza" VerticalAlignment="Center"/>
+                </CheckBox>
+            </Grid>
+        </Border>
+
+        <!-- 3. Main 4-Option Gallery -->
+        <Grid Grid.Row="2" Margin="24,0,24,16">
+            <!-- Empty State -->
+            <Border x:Name="PanelNoOptions" CornerRadius="8"
+                    Background="{DynamicResource LayerBrush}"
+                    BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1"
+                    Visibility="Collapsed">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24">
+                    <TextBlock Text="&#xEB9F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif"
+                               FontSize="32" Foreground="{DynamicResource TextTertiaryBrush}"
+                               HorizontalAlignment="Center" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="TxtNoOptions" Text="No se encontraron opciones de artwork para esta pieza."
+                               FontSize="14" Foreground="{DynamicResource TextSecondaryBrush}"
+                               HorizontalAlignment="Center" TextWrapping="Wrap"/>
+                </StackPanel>
+            </Border>
+
+            <!-- 4-Card Uniform Grid (Columns dynamically 4 for Poster/Icon, 2 for Wide/Hero/Logo) -->
+            <UniformGrid x:Name="GridOptions" Columns="4" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+        </Grid>
+
+        <!-- 4. Fluent 2 ContentDialog Footer -->
+        <Border Grid.Row="3" Background="{DynamicResource FooterBrush}"
+                BorderBrush="{DynamicResource DividerBrush}" BorderThickness="0,1,0,0"
+                Padding="24,12">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <TextBlock x:Name="TxtFooterHint" Grid.Column="0"
+                           Text="Flechas: elegir • Tab: pieza • Enter: aplicar • Esc: omitir"
+                           FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                           Margin="0,0,12,0"/>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button x:Name="BtnSkipAll"
+                            Style="{StaticResource PickerSecondaryButtonStyle}"
+                            Margin="0,0,8,0" Click="BtnSkipAll_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtSkipAllBadge" Text="Esc" FontSize="11" FontWeight="SemiBold"
+                                       Opacity="0.8" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtSkipAllLabel" Text="Omitir" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="BtnApply"
+                            Style="{StaticResource PickerAccentButtonStyle}"
+                            Click="BtnApply_Click">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="TxtApplyBadge" Text="Enter" FontSize="11" FontWeight="SemiBold"
+                                       Opacity="0.9" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TxtApplyLabel" Text="Aplicar carátulas" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

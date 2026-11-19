@@ -217,4 +217,30 @@ public class OptionsTests
         Assert.True(options.SkipArtwork);
         Assert.Equal("C:\\custom\\settings.json", options.SettingsFilePath);
     }
+
+    [Theory]
+    [InlineData("--list-steam")]
+    [InlineData("--list-shortcuts")]
+    public void Parse_WithListSteamShortcuts_ParsesCorrectly(string flag)
+    {
+        var (options, error) = Options.Parse(new[] { flag });
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.True(options.ListSteamShortcuts);
+    }
+
+    [Theory]
+    [InlineData("--remove", "Hollow Knight")]
+    [InlineData("--delete", "Hollow Knight")]
+    [InlineData("--remove-shortcut", "Elden Ring")]
+    [InlineData("--delete-shortcut", "Elden Ring")]
+    public void Parse_WithRemoveShortcut_ParsesCorrectly(string flag, string title)
+    {
+        var (options, error) = Options.Parse(new[] { flag, title });
+
+        Assert.Null(error);
+        Assert.NotNull(options);
+        Assert.Equal(title, options.RemoveShortcutTitle);
+    }
 }

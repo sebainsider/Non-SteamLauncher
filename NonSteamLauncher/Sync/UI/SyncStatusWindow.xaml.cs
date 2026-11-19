@@ -8,6 +8,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
@@ -41,13 +42,20 @@ public partial class SyncStatusWindow : Window
     private ushort _prevGamepadButtons;
     private bool _gamepadAxisReleased = true;
     private int _gamepadDirCooldown;
-    private int _gamepadDetectCounter;
-    private bool _initialButtonsCleared;
     private bool _xinputFailed;
     private bool _winmmFailed;
+    private int _cachedWinmmJoyId = -1;
     private Point _lastMousePos;
+    private bool _hasMouseMovedOnce;
     private bool _isUpdatingLanguage;
     private int _settingsFocusIndex;
+    private readonly Func<InstalledGame, SteamSyncResult>? _onRemoveGame;
+    private readonly Func<IReadOnlyList<InstalledGame>, List<GameArtworkOptions>>? _onFetchArtworkOptions;
+    private readonly Func<IReadOnlyList<GameArtworkSelection>, SteamSyncResult>? _onApplyArtworkSelections;
+    private GameCardItem? _pendingDeleteItem;
+    private bool _isSyncingInProgress;
+    private DispatcherTimer? _syncSpinTimer;
+    private double _currentSpinAngle;
 
     public ObservableCollection<GameCardItem> GameItems { get; } = new();
 
@@ -55,7 +63,10 @@ public partial class SyncStatusWindow : Window
         SteamSyncResult result,
         Func<IReadOnlyList<InstalledGame>, SteamSyncResult>? onSyncSelected = null,
         Func<SteamSyncResult>? onSettingsSaved = null,
-        string? settingsFilePath = null)
+        string? settingsFilePath = null,
+        Func<InstalledGame, SteamSyncResult>? onRemoveGame = null,
+        Func<IReadOnlyList<InstalledGame>, List<GameArtworkOptions>>? onFetchArtworkOptions = null,
+        Func<IReadOnlyList<GameArtworkSelection>, SteamSyncResult>? onApplyArtworkSelections = null)
     {
         InitializeComponent();
 
@@ -63,6 +74,9 @@ public partial class SyncStatusWindow : Window
         _currentResult = result;
         _onSyncSelected = onSyncSelected;
         _onSettingsSaved = onSettingsSaved;
+        _onRemoveGame = onRemoveGame;
+        _onFetchArtworkOptions = onFetchArtworkOptions;
+        _onApplyArtworkSelections = onApplyArtworkSelections;
         _settingsFilePath = settingsFilePath;
         _appSettings = AppSettings.Load(settingsFilePath);
 
@@ -104,22 +118,71 @@ public partial class SyncStatusWindow : Window
         Closed += (s, e) =>
         {
             _gamepadTimer?.Stop();
+            _syncSpinTimer?.Stop();
         };
 
-        // Keyboard & Mouse Listeners to instantly switch to Keyboard Mode
+        // Keyboard & Mouse Listeners to switch to Keyboard Mode only on actual user actions
         PreviewMouseMove += (s, e) =>
         {
             var pos = e.GetPosition(this);
-            if (Math.Abs(pos.X - _lastMousePos.X) > 3 || Math.Abs(pos.Y - _lastMousePos.Y) > 3)
+            if (!_hasMouseMovedOnce)
+            {
+                _hasMouseMovedOnce = true;
+                _lastMousePos = pos;
+                return;
+            }
+
+            if (Math.Abs(pos.X - _lastMousePos.X) > 6 || Math.Abs(pos.Y - _lastMousePos.Y) > 6)
             {
                 _lastMousePos = pos;
                 SetInputMode(ActiveInputMode.Keyboard);
             }
         };
 
-        PreviewKeyDown += (s, e) =>
+        PreviewMouseDown += (s, e) =>
         {
             SetInputMode(ActiveInputMode.Keyboard);
+        };
+
+        PreviewKeyDown += (s, e) =>
+        {
+            if (_isSyncingInProgress)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            SetInputMode(ActiveInputMode.Keyboard);
+
+            if (DialogOverlay.Visibility == Visibility.Visible)
+            {
+                if (e.Key == Key.Escape)
+                {
+                    BtnCancelDelete_Click(this, new RoutedEventArgs());
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Enter)
+                {
+                    if (BtnCancelDelete.IsFocused)
+                    {
+                        BtnCancelDelete_Click(this, new RoutedEventArgs());
+                    }
+                    else
+                    {
+                        BtnConfirmDelete_Click(this, new RoutedEventArgs());
+                    }
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Left || e.Key == Key.Right || e.Key == Key.Tab)
+                {
+                    if (BtnConfirmDelete.IsFocused)
+                        BtnCancelDelete.Focus();
+                    else
+                        BtnConfirmDelete.Focus();
+                    e.Handled = true;
+                }
+                return;
+            }
 
             if (e.Key == Key.Escape)
             {
@@ -136,6 +199,14 @@ public partial class SyncStatusWindow : Window
                 if (ListGames.SelectedItem is GameCardItem item && !item.IsSynced)
                 {
                     item.IsSelected = !item.IsSelected;
+                    e.Handled = true;
+                }
+            }
+            else if ((e.Key == Key.Delete || e.Key == Key.Back) && PanelGames.Visibility == Visibility.Visible)
+            {
+                if (ListGames.SelectedItem is GameCardItem item && item.IsSynced)
+                {
+                    RequestDeleteGame(item);
                     e.Handled = true;
                 }
             }
@@ -166,6 +237,7 @@ public partial class SyncStatusWindow : Window
 
     private void SwitchTab(int tabIndex)
     {
+        if (_isSyncingInProgress) return;
         if (PanelGames == null || PanelSettings == null || TabGames == null || TabSettings == null) return;
 
         if (tabIndex == 0)
@@ -244,24 +316,32 @@ public partial class SyncStatusWindow : Window
                 break;
         }
 
-        // 3. Footer Action Button Badges
+        // 3. Footer Action Button Badges & Dialog Badges
         switch (_activeInputMode)
         {
             case ActiveInputMode.Keyboard:
                 BadgePrimaryAction.Content = CreateKeycapBadge(_strings.KeyNameEnter);
                 BadgeClose.Content = CreateKeycapBadge(_strings.KeyNameEsc);
+                if (BadgeConfirmDelete != null) BadgeConfirmDelete.Content = CreateKeycapBadge(_strings.KeyNameEnter);
+                if (BadgeCancelDelete != null) BadgeCancelDelete.Content = CreateKeycapBadge(_strings.KeyNameEsc);
                 break;
             case ActiveInputMode.PlayStation:
                 BadgePrimaryAction.Content = CreatePlayStationBadge("square");
                 BadgeClose.Content = CreatePlayStationBadge("circle");
+                if (BadgeConfirmDelete != null) BadgeConfirmDelete.Content = CreatePlayStationBadge("cross");
+                if (BadgeCancelDelete != null) BadgeCancelDelete.Content = CreatePlayStationBadge("circle");
                 break;
             case ActiveInputMode.Nintendo:
                 BadgePrimaryAction.Content = CreateXboxBadge("Y", System.Windows.Media.Color.FromRgb(255, 185, 0));
                 BadgeClose.Content = CreateXboxBadge("B", System.Windows.Media.Color.FromRgb(216, 59, 1));
+                if (BadgeConfirmDelete != null) BadgeConfirmDelete.Content = CreateXboxBadge("A", System.Windows.Media.Color.FromRgb(220, 40, 40));
+                if (BadgeCancelDelete != null) BadgeCancelDelete.Content = CreateXboxBadge("B", System.Windows.Media.Color.FromRgb(120, 120, 120));
                 break;
             default: // Xbox
                 BadgePrimaryAction.Content = CreateXboxBadge("X", System.Windows.Media.Color.FromRgb(0, 120, 215));
                 BadgeClose.Content = CreateXboxBadge("B", System.Windows.Media.Color.FromRgb(216, 59, 1));
+                if (BadgeConfirmDelete != null) BadgeConfirmDelete.Content = CreateXboxBadge("A", System.Windows.Media.Color.FromRgb(16, 124, 16));
+                if (BadgeCancelDelete != null) BadgeCancelDelete.Content = CreateXboxBadge("B", System.Windows.Media.Color.FromRgb(216, 59, 1));
                 break;
         }
 
@@ -277,32 +357,61 @@ public partial class SyncStatusWindow : Window
         if (PanelFooterLegend == null) return;
         PanelFooterLegend.Children.Clear();
 
+        bool isSelectedSynced = PanelGames.Visibility == Visibility.Visible && 
+                                ListGames?.SelectedItem is GameCardItem sel && 
+                                sel.IsSynced;
+
         switch (_activeInputMode)
         {
             case ActiveInputMode.Keyboard:
                 AddLegendItem(CreateKeycapBadge(_strings.KeyNameTab), _strings.LegendTabs);
                 AddLegendSeparator();
-                AddLegendItem(CreateKeycapBadge(_strings.KeyNameSpace), _strings.LegendToggle);
-                AddLegendSeparator();
-                AddLegendItem(CreateKeycapBadge(_strings.KeyNameEnter), _strings.LegendSync);
+                if (isSelectedSynced)
+                {
+                    AddLegendItem(CreateKeycapBadge("Del"), _strings.LegendDelete);
+                }
+                else
+                {
+                    AddLegendItem(CreateKeycapBadge(_strings.KeyNameSpace), _strings.LegendToggle);
+                    AddLegendSeparator();
+                    AddLegendItem(CreateKeycapBadge(_strings.KeyNameEnter), _strings.LegendSync);
+                }
                 AddLegendSeparator();
                 AddLegendItem(CreateKeycapBadge(_strings.KeyNameEsc), _strings.LegendClose);
                 break;
             case ActiveInputMode.PlayStation:
                 AddLegendItem(CreateBumperBadge("L1/R1"), _strings.LegendTabs);
                 AddLegendSeparator();
-                AddLegendItem(CreatePlayStationBadge("cross"), _strings.LegendToggle);
-                AddLegendSeparator();
-                AddLegendItem(CreatePlayStationBadge("square"), _strings.LegendSync);
+                if (isSelectedSynced)
+                {
+                    AddLegendItem(CreatePlayStationBadge("cross"), _strings.TabArtwork);
+                    AddLegendSeparator();
+                    AddLegendItem(CreatePlayStationBadge("triangle"), _strings.LegendDelete);
+                }
+                else
+                {
+                    AddLegendItem(CreatePlayStationBadge("cross"), _strings.LegendToggle);
+                    AddLegendSeparator();
+                    AddLegendItem(CreatePlayStationBadge("square"), _strings.LegendSync);
+                }
                 AddLegendSeparator();
                 AddLegendItem(CreatePlayStationBadge("circle"), _strings.LegendClose);
                 break;
             default: // Xbox
                 AddLegendItem(CreateBumperBadge("LB/RB"), _strings.LegendTabs);
                 AddLegendSeparator();
-                AddLegendItem(CreateXboxBadge("A", System.Windows.Media.Color.FromRgb(16, 124, 16)), _strings.LegendToggle);
-                AddLegendSeparator();
-                AddLegendItem(CreateXboxBadge("X", System.Windows.Media.Color.FromRgb(0, 120, 215)), _strings.LegendSync);
+                if (isSelectedSynced)
+                {
+                    AddLegendItem(CreateXboxBadge("A", System.Windows.Media.Color.FromRgb(16, 124, 16)), _strings.TabArtwork);
+                    AddLegendSeparator();
+                    AddLegendItem(CreateXboxBadge("Y", System.Windows.Media.Color.FromRgb(255, 185, 0)), _strings.LegendDelete);
+                }
+                else
+                {
+                    AddLegendItem(CreateXboxBadge("A", System.Windows.Media.Color.FromRgb(16, 124, 16)), _strings.LegendToggle);
+                    AddLegendSeparator();
+                    AddLegendItem(CreateXboxBadge("X", System.Windows.Media.Color.FromRgb(0, 120, 215)), _strings.LegendSync);
+                }
                 AddLegendSeparator();
                 AddLegendItem(CreateXboxBadge("B", System.Windows.Media.Color.FromRgb(216, 59, 1)), _strings.LegendClose);
                 break;
@@ -515,8 +624,17 @@ public partial class SyncStatusWindow : Window
         BtnPasteKey.Content = _strings.SettingsPasteButton;
         BtnClearKey.Content = _strings.SettingsClearButton;
         BtnGetKey.Content = _strings.SettingsGetKeyButton;
+        if (TxtSyncArtworkTitle != null) TxtSyncArtworkTitle.Text = _strings.SettingsSyncArtworkTitle;
+        if (BtnSyncArtwork != null) BtnSyncArtwork.Content = _strings.SettingsSyncArtworkButton;
         TxtLanguageLabel.Text = _strings.SettingsLanguageLabel;
         TxtClose.Text = _strings.ActionClose;
+        if (TxtConfirmDelete != null) TxtConfirmDelete.Text = _strings.DialogDeleteConfirm;
+        if (TxtCancelDelete != null) TxtCancelDelete.Text = _strings.DialogDeleteCancel;
+        if (_isSyncingInProgress)
+        {
+            TxtInfoMessage.Text = _strings.StatusSyncing;
+            TxtPrimaryAction.Text = _strings.StatusSyncingGame;
+        }
     }
 
     private void ApplySystemFluentTheme()
@@ -592,6 +710,13 @@ public partial class SyncStatusWindow : Window
         Resources["AccentPressedBrush"] = new SolidColorBrush(accentPressed);
         Resources["AccentTintBrush"] = new SolidColorBrush(accentTint);
         Resources["TextOnAccentBrush"] = new SolidColorBrush(textOnAccent);
+
+        System.Windows.Media.Color critCol = isLight 
+            ? System.Windows.Media.Color.FromRgb(196, 43, 28) 
+            : System.Windows.Media.Color.FromRgb(255, 153, 164);
+        System.Windows.Media.Color critHover = BlendColor(critCol, bgBase, 0.90);
+        Resources["CriticalBrush"] = new SolidColorBrush(critCol);
+        Resources["CriticalHoverBrush"] = new SolidColorBrush(critHover);
     }
 
     private void PopulateView(SteamSyncResult result)
@@ -680,6 +805,7 @@ public partial class SyncStatusWindow : Window
     private void UpdateFooterButtons()
     {
         if (BtnPrimaryAction == null || BtnClose == null || PanelSettings == null || TxtPrimaryAction == null || TxtClose == null) return;
+        if (_isSyncingInProgress) return;
 
         int unsyncedCount = GameItems.Count(g => !g.IsSynced);
         int selectedCount = GameItems.Count(g => !g.IsSynced && g.IsSelected);
@@ -725,6 +851,8 @@ public partial class SyncStatusWindow : Window
             HasCustomIcon = hasCustomIcon,
             IsSynced = isSynced,
             IsSelected = false,
+            DeleteToolTip = _strings.TooltipDeleteShortcut,
+            ChooseArtworkToolTip = _strings.TooltipChooseArtwork,
             RowBorderBrush = System.Windows.Media.Brushes.Transparent,
             RowBorderThickness = new Thickness(1),
             RowBgBrush = (System.Windows.Media.Brush)Resources["LayerBrush"]
@@ -733,7 +861,7 @@ public partial class SyncStatusWindow : Window
         UpdateGameCardStatusVisuals(item, isLight);
         item.PropertyChanged += (s, e) =>
         {
-            if (e.PropertyName == nameof(GameCardItem.IsSelected))
+            if (e.PropertyName == nameof(GameCardItem.IsSelected) || e.PropertyName == nameof(GameCardItem.IsSyncing))
             {
                 UpdateGameCardStatusVisuals(item, isLight);
                 UpdateFooterButtons();
@@ -745,7 +873,17 @@ public partial class SyncStatusWindow : Window
 
     private void UpdateGameCardStatusVisuals(GameCardItem item, bool isLight)
     {
-        if (item.IsSynced)
+        if (item.IsSyncing)
+        {
+            item.StatusGlyph = "\uE895"; // Sync glyph
+            item.StatusText = _strings.StatusSyncingGame;
+
+            System.Windows.Media.Color syncCol = isLight 
+                ? QuerySystemAccentColor(isLight) 
+                : System.Windows.Media.Color.FromRgb(100, 195, 255);
+            item.StatusBrush = new SolidColorBrush(syncCol);
+        }
+        else if (item.IsSynced)
         {
             item.StatusGlyph = "\uE73E"; // Subtle checkmark
             item.StatusText = _strings.StatusInSteam;
@@ -797,6 +935,8 @@ public partial class SyncStatusWindow : Window
                 item.RowBgBrush = (System.Windows.Media.Brush)Resources["LayerBrush"];
             }
         }
+
+        BuildFooterLegend();
     }
 
     private void UpdateSettingsFocusVisuals()
@@ -813,8 +953,14 @@ public partial class SyncStatusWindow : Window
         BorderSettingApiKey.BorderBrush = (_settingsFocusIndex >= 1 && _settingsFocusIndex <= 4) ? accentBorder : defaultBorder;
         BorderSettingApiKey.BorderThickness = (_settingsFocusIndex >= 1 && _settingsFocusIndex <= 4) ? new Thickness(1.5) : new Thickness(1);
 
-        BorderSettingLanguage.BorderBrush = (_settingsFocusIndex == 5) ? accentBorder : defaultBorder;
-        BorderSettingLanguage.BorderThickness = (_settingsFocusIndex == 5) ? new Thickness(1.5) : new Thickness(1);
+        if (BorderSettingSyncArtwork != null)
+        {
+            BorderSettingSyncArtwork.BorderBrush = (_settingsFocusIndex == 5) ? accentBorder : defaultBorder;
+            BorderSettingSyncArtwork.BorderThickness = (_settingsFocusIndex == 5) ? new Thickness(1.5) : new Thickness(1);
+        }
+
+        BorderSettingLanguage.BorderBrush = (_settingsFocusIndex == 6) ? accentBorder : defaultBorder;
+        BorderSettingLanguage.BorderThickness = (_settingsFocusIndex == 6) ? new Thickness(1.5) : new Thickness(1);
     }
 
     private void ToggleSelectAll()
@@ -1009,15 +1155,250 @@ public partial class SyncStatusWindow : Window
         catch { }
     }
 
-    private void SaveSettings()
+    private void StartSyncAnimations()
     {
+        var anim = new DoubleAnimation(0, 360, new Duration(TimeSpan.FromSeconds(1)))
+        {
+            RepeatBehavior = RepeatBehavior.Forever
+        };
+        InfoSyncRotate.BeginAnimation(RotateTransform.AngleProperty, anim);
+        PrimarySpinRotate.BeginAnimation(RotateTransform.AngleProperty, anim);
+
+        _syncSpinTimer = new DispatcherTimer(DispatcherPriority.Render)
+        {
+            Interval = TimeSpan.FromMilliseconds(33)
+        };
+        _syncSpinTimer.Tick += (s, e) =>
+        {
+            _currentSpinAngle = (_currentSpinAngle + 12) % 360;
+            foreach (var item in GameItems)
+            {
+                if (item.IsSyncing)
+                {
+                    item.SyncSpinAngle = _currentSpinAngle;
+                }
+            }
+        };
+        _syncSpinTimer.Start();
+    }
+
+    private void StopSyncAnimations()
+    {
+        _syncSpinTimer?.Stop();
+        _syncSpinTimer = null;
+        InfoSyncRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+        PrimarySpinRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+    }
+
+    private void SetSyncingState(bool isSyncing)
+    {
+        _isSyncingInProgress = isSyncing;
+
+        if (isSyncing)
+        {
+            TxtInfoIcon.Visibility = Visibility.Collapsed;
+            TxtInfoSyncSpin.Visibility = Visibility.Visible;
+            ProgressSync.Visibility = Visibility.Visible;
+            ProgressSync.IsIndeterminate = true;
+            TxtInfoMessage.Text = _strings.StatusSyncing;
+
+            IconPrimarySpin.Visibility = Visibility.Visible;
+            BadgePrimaryAction.Visibility = Visibility.Collapsed;
+            TxtPrimaryAction.Text = _strings.StatusSyncingGame;
+
+            BtnPrimaryAction.IsEnabled = false;
+            BtnClose.IsEnabled = false;
+            TabGames.IsEnabled = false;
+            TabSettings.IsEnabled = false;
+            ListGames.IsEnabled = false;
+
+            StartSyncAnimations();
+        }
+        else
+        {
+            StopSyncAnimations();
+
+            ProgressSync.IsIndeterminate = false;
+            ProgressSync.Visibility = Visibility.Collapsed;
+            TxtInfoSyncSpin.Visibility = Visibility.Collapsed;
+            TxtInfoIcon.Visibility = Visibility.Visible;
+
+            IconPrimarySpin.Visibility = Visibility.Collapsed;
+            BadgePrimaryAction.Visibility = Visibility.Visible;
+
+            BtnPrimaryAction.IsEnabled = true;
+            BtnClose.IsEnabled = true;
+            TabGames.IsEnabled = true;
+            TabSettings.IsEnabled = true;
+            ListGames.IsEnabled = true;
+        }
+    }
+
+    private void SaveSettings(bool triggerArtworkSync = true)
+    {
+        bool wasArtworkEnabled = _appSettings.DownloadArtwork;
+        string? oldApiKey = _appSettings.SteamGridDbApiKey;
+
         _appSettings.DownloadArtwork = ChkDownloadArtwork.IsChecked ?? true;
         _appSettings.SteamGridDbApiKey = TxtApiKey.Text.Trim();
         _appSettings.Save(_settingsFilePath);
+
+        if (!triggerArtworkSync)
+            return;
+
+        if ((!wasArtworkEnabled && _appSettings.DownloadArtwork) ||
+            (!string.IsNullOrEmpty(_appSettings.SteamGridDbApiKey) && !string.Equals(oldApiKey, _appSettings.SteamGridDbApiKey, StringComparison.OrdinalIgnoreCase)))
+        {
+            if (_onFetchArtworkOptions != null && _onApplyArtworkSelections != null)
+            {
+                var syncedGames = GameItems.Where(g => g.IsSynced).Select(g => g.Game).ToList();
+                if (syncedGames.Count > 0)
+                {
+                    _ = RunInteractiveArtworkSyncAsync(syncedGames);
+                }
+            }
+            else if (_onSettingsSaved != null)
+            {
+                SetSyncingState(true);
+                Task.Run(() =>
+                {
+                    try
+                    {
+                        var updated = _onSettingsSaved();
+                        Dispatcher.Invoke(() =>
+                        {
+                            if (updated != null)
+                            {
+                                _currentResult = updated;
+                                PopulateView(_currentResult);
+                            }
+                        });
+                    }
+                    catch { }
+                    finally
+                    {
+                        Dispatcher.Invoke(() => SetSyncingState(false));
+                    }
+                });
+            }
+        }
     }
 
-    private void BtnPrimaryAction_Click(object sender, RoutedEventArgs e)
+    private async Task RunInteractiveArtworkSyncAsync(IReadOnlyList<InstalledGame> targetGames)
     {
+        if (_isSyncingInProgress || targetGames.Count == 0)
+            return;
+
+        if (!_appSettings.DownloadArtwork || _onFetchArtworkOptions == null || _onApplyArtworkSelections == null)
+            return;
+
+        List<GameArtworkOptions>? optionsList = null;
+
+        SetSyncingState(true);
+        TxtInfoMessage.Text = _strings.StatusFetchingArtworkOptions;
+        try
+        {
+            optionsList = await Task.Run(() => _onFetchArtworkOptions(targetGames));
+        }
+        catch (Exception ex)
+        {
+            _currentResult.ErrorMessage = ex.Message;
+        }
+        finally
+        {
+            SetSyncingState(false);
+        }
+
+        var available = optionsList?.Where(o => o.HasAnyOptions).ToList();
+        if (available == null || available.Count == 0)
+        {
+            PopulateView(_currentResult);
+            return;
+        }
+
+        var picker = new ArtworkPickerWindow(available, _strings, _activeInputMode)
+        {
+            Owner = this
+        };
+
+        // Pause parent gamepad polling while modal picker is open so inputs never leak
+        _gamepadTimer?.Stop();
+        bool? dialogResult;
+        try
+        {
+            dialogResult = picker.ShowDialog();
+        }
+        finally
+        {
+            if (TryReadGamepadInput(out ushort heldButtons, out _, out _))
+            {
+                _prevGamepadButtons = heldButtons;
+            }
+            _gamepadTimer?.Start();
+        }
+
+        if (dialogResult != true || !picker.Confirmed)
+        {
+            PopulateView(_currentResult);
+            return;
+        }
+
+        var selections = picker.GetSelections();
+
+        SetSyncingState(true);
+        TxtInfoMessage.Text = _strings.StatusApplyingArtwork;
+        try
+        {
+            var updated = await Task.Run(() => _onApplyArtworkSelections(selections));
+            if (updated != null)
+            {
+                _currentResult = updated;
+            }
+        }
+        catch (Exception ex)
+        {
+            _currentResult = new SteamSyncResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message,
+                PendingGames = _currentResult.PendingGames,
+                ExistingGames = _currentResult.ExistingGames,
+                AddedGames = _currentResult.AddedGames
+            };
+        }
+        finally
+        {
+            SetSyncingState(false);
+            PopulateView(_currentResult);
+        }
+    }
+
+    private async void BtnSyncArtwork_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isSyncingInProgress) return;
+        SaveSettings(triggerArtworkSync: false);
+        SwitchTab(0);
+
+        var syncedGames = GameItems.Where(g => g.IsSynced).Select(g => g.Game).ToList();
+        if (syncedGames.Count > 0)
+        {
+            await RunInteractiveArtworkSyncAsync(syncedGames);
+        }
+    }
+
+    private async void BtnChooseArtwork_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isSyncingInProgress) return;
+        if (sender is Button btn && btn.Tag is GameCardItem item)
+        {
+            await RunInteractiveArtworkSyncAsync(new[] { item.Game });
+        }
+    }
+
+    private async void BtnPrimaryAction_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isSyncingInProgress) return;
+
         if (PanelSettings.Visibility == Visibility.Visible)
         {
             SaveSettings();
@@ -1038,27 +1419,127 @@ public partial class SyncStatusWindow : Window
             return;
         }
 
-        if (_onSyncSelected != null)
+        var syncingItems = GameItems.Where(g => !g.IsSynced && g.IsSelected).ToList();
+        if (syncingItems.Count == 0) return;
+
+        bool isLight = QuerySystemLightModePreference();
+        foreach (var item in syncingItems)
         {
-            var toSync = GameItems.Where(g => !g.IsSynced && g.IsSelected).Select(g => g.Game).ToList();
-            _currentResult = _onSyncSelected(toSync);
+            item.IsSyncing = true;
+            UpdateGameCardStatusVisuals(item, isLight);
+        }
+
+        SetSyncingState(true);
+
+        var syncedGamesForArtwork = syncingItems.Select(g => g.Game).ToList();
+        bool syncSucceeded = false;
+
+        try
+        {
+            if (_onSyncSelected != null)
+            {
+                _currentResult = await Task.Run(() => _onSyncSelected(syncedGamesForArtwork));
+                syncSucceeded = _currentResult.Success;
+            }
+            else
+            {
+                await Task.Delay(400);
+                foreach (var item in syncingItems)
+                {
+                    item.IsSynced = true;
+                    item.IsSelected = false;
+                }
+                syncSucceeded = true;
+            }
+        }
+        catch (Exception ex)
+        {
+            _currentResult = new SteamSyncResult
+            {
+                Success = false,
+                ErrorMessage = ex.Message,
+                PendingGames = _currentResult.PendingGames,
+                ExistingGames = _currentResult.ExistingGames,
+                AddedGames = _currentResult.AddedGames
+            };
+        }
+        finally
+        {
+            foreach (var item in syncingItems)
+            {
+                item.IsSyncing = false;
+            }
+            SetSyncingState(false);
             PopulateView(_currentResult);
         }
-        else
+
+        if (syncSucceeded && _appSettings.DownloadArtwork && _onFetchArtworkOptions != null && _onApplyArtworkSelections != null)
         {
-            foreach (var item in GameItems.Where(g => !g.IsSynced && g.IsSelected))
-            {
-                item.IsSynced = true;
-                item.IsSelected = false;
-            }
-            PopulateView(_currentResult);
+            await RunInteractiveArtworkSyncAsync(syncedGamesForArtwork);
         }
     }
 
     private void BtnClose_Click(object sender, RoutedEventArgs e)
     {
-        SaveSettings();
+        if (_isSyncingInProgress) return;
+        SaveSettings(triggerArtworkSync: false);
         Close();
+    }
+
+    private void BtnDeleteGame_Click(object sender, RoutedEventArgs e)
+    {
+        if (_isSyncingInProgress) return;
+        if (sender is Button btn && btn.Tag is GameCardItem item)
+        {
+            RequestDeleteGame(item);
+        }
+    }
+
+    public void RequestDeleteGame(GameCardItem item)
+    {
+        _pendingDeleteItem = item;
+        TxtDialogTitle.Text = _strings.DialogDeleteTitle;
+        TxtDialogMessage.Text = string.Format(_strings.DialogDeleteMessageFormat, item.Title);
+        if (TxtConfirmDelete != null) TxtConfirmDelete.Text = _strings.DialogDeleteConfirm;
+        if (TxtCancelDelete != null) TxtCancelDelete.Text = _strings.DialogDeleteCancel;
+        DialogOverlay.Visibility = Visibility.Visible;
+        BtnConfirmDelete.Focus();
+    }
+
+    public bool IsDeleteDialogVisible => DialogOverlay.Visibility == Visibility.Visible;
+    public void ConfirmDelete() => BtnConfirmDelete_Click(this, new RoutedEventArgs());
+    public void CancelDelete() => BtnCancelDelete_Click(this, new RoutedEventArgs());
+
+    private void BtnConfirmDelete_Click(object sender, RoutedEventArgs e)
+    {
+        DialogOverlay.Visibility = Visibility.Collapsed;
+        if (_pendingDeleteItem != null)
+        {
+            var item = _pendingDeleteItem;
+            _pendingDeleteItem = null;
+            ExecuteRemoveGame(item);
+        }
+    }
+
+    private void BtnCancelDelete_Click(object sender, RoutedEventArgs e)
+    {
+        DialogOverlay.Visibility = Visibility.Collapsed;
+        _pendingDeleteItem = null;
+    }
+
+    private void ExecuteRemoveGame(GameCardItem item)
+    {
+        if (_onRemoveGame != null)
+        {
+            _currentResult = _onRemoveGame(item.Game);
+            PopulateView(_currentResult);
+        }
+        else
+        {
+            GameItems.Remove(item);
+            _currentResult.ExistingGames.RemoveAll(g => g.Title.Equals(item.Title, StringComparison.OrdinalIgnoreCase));
+            PopulateView(_currentResult);
+        }
     }
 
     // =====================================================================
@@ -1076,24 +1557,16 @@ public partial class SyncStatusWindow : Window
 
     private void GamepadTimer_Tick(object? sender, EventArgs e)
     {
+        if (_isSyncingInProgress)
+            return;
+
         if (_gamepadDirCooldown > 0)
             _gamepadDirCooldown--;
-
-        _gamepadDetectCounter++;
-        if (_gamepadDetectCounter >= 30)
-        {
-            _gamepadDetectCounter = 0;
-            var connected = GamepadDetector.DetectConnectedGamepad();
-            if (connected != GamepadType.Keyboard && _activeInputMode == ActiveInputMode.Keyboard)
-            {
-                // Controller plugged in, but keep keyboard until controller is touched
-            }
-        }
 
         if (!TryReadGamepadInput(out ushort buttons, out int dirX, out int dirY))
             return;
 
-        // If any button or joystick axis is moved, immediately switch to Gamepad mode
+        // Only switch to Gamepad mode when an ACTUAL button or stick action is taken
         if (buttons != 0 || dirX != 0 || dirY != 0)
         {
             var family = GamepadDetector.DetectGamepadFamily();
@@ -1107,18 +1580,47 @@ public partial class SyncStatusWindow : Window
             }
         }
 
-        if (!_initialButtonsCleared)
-        {
-            if (buttons == 0 && dirX == 0 && dirY == 0)
-            {
-                _initialButtonsCleared = true;
-            }
-            _prevGamepadButtons = buttons;
-            return;
-        }
-
         ushort newlyPressed = (ushort)(buttons & ~_prevGamepadButtons);
         _prevGamepadButtons = buttons;
+
+        if (DialogOverlay.Visibility == Visibility.Visible)
+        {
+            if ((newlyPressed & 0x2000) != 0 || (newlyPressed & 0x0020) != 0) // B / Back / Circle
+            {
+                BtnCancelDelete_Click(this, new RoutedEventArgs());
+                return;
+            }
+
+            if ((newlyPressed & 0x1000) != 0 || (newlyPressed & 0x4000) != 0) // A / Cross or X / Square
+            {
+                if (BtnCancelDelete.IsFocused)
+                {
+                    BtnCancelDelete_Click(this, new RoutedEventArgs());
+                }
+                else
+                {
+                    BtnConfirmDelete_Click(this, new RoutedEventArgs());
+                }
+                return;
+            }
+
+            if (dirX == 0)
+            {
+                _gamepadAxisReleased = true;
+                _gamepadDirCooldown = 0;
+            }
+            else if (_gamepadAxisReleased || _gamepadDirCooldown == 0)
+            {
+                if (dirX > 0)
+                    BtnCancelDelete.Focus();
+                else if (dirX < 0)
+                    BtnConfirmDelete.Focus();
+
+                _gamepadAxisReleased = false;
+                _gamepadDirCooldown = 6;
+            }
+            return;
+        }
 
         // 1. Tab Switching via Bumpers (LB / L1 = Tab 0, RB / R1 = Tab 1)
         if ((newlyPressed & 0x0100) != 0) // LB / L1
@@ -1145,13 +1647,23 @@ public partial class SyncStatusWindow : Window
                 if (dirY != 0)
                 {
                     int current = ListGames.SelectedIndex;
-                    int next = Math.Clamp(current + dirY, 0, GameItems.Count - 1);
+                    int next = (current < 0)
+                        ? (dirY > 0 ? 0 : GameItems.Count - 1)
+                        : Math.Clamp(current + dirY, 0, GameItems.Count - 1);
 
                     if (next != current)
                     {
+                        if (current >= 0 && current < GameItems.Count)
+                            GameItems[current].IsDeleteFocused = false;
+
                         ListGames.SelectedIndex = next;
                         ListGames.ScrollIntoView(ListGames.SelectedItem);
                     }
+                }
+                else if (dirX != 0 && ListGames.SelectedItem is GameCardItem curItem && curItem.IsSynced)
+                {
+                    // Tilt right focuses the Delete button on the row; tilt left returns to card
+                    curItem.IsDeleteFocused = (dirX > 0);
                 }
             }
             else if (PanelSettings.Visibility == Visibility.Visible)
@@ -1159,7 +1671,7 @@ public partial class SyncStatusWindow : Window
                 // Artwork Tab Joystick Navigation!
                 if (dirY != 0)
                 {
-                    _settingsFocusIndex = Math.Clamp(_settingsFocusIndex + dirY, 0, 5);
+                    _settingsFocusIndex = Math.Clamp(_settingsFocusIndex + dirY, 0, 6);
                     UpdateSettingsFocusVisuals();
                 }
                 else if (dirX != 0 && _settingsFocusIndex >= 2 && _settingsFocusIndex <= 4)
@@ -1174,12 +1686,31 @@ public partial class SyncStatusWindow : Window
         }
 
         // 3. Action Buttons (A / Cross, B / Circle, X / Square, Y / Triangle)
-        // A (0x1000) = Toggle selection or activate setting control
+        // A (0x1000) = Toggle selection, choose artwork (or delete if delete focused) for synced games, or activate setting control
         if ((newlyPressed & 0x1000) != 0)
         {
-            if (PanelGames.Visibility == Visibility.Visible && ListGames.SelectedItem is GameCardItem item && !item.IsSynced)
+            if (PanelGames.Visibility == Visibility.Visible && ListGames.SelectedItem is GameCardItem item)
             {
-                item.IsSelected = !item.IsSelected;
+                if (item.IsSynced)
+                {
+                    if (item.IsDeleteFocused)
+                    {
+                        RequestDeleteGame(item);
+                    }
+                    else if (_onFetchArtworkOptions != null && _onApplyArtworkSelections != null)
+                    {
+                        _ = RunInteractiveArtworkSyncAsync(new[] { item.Game });
+                    }
+                    else
+                    {
+                        RequestDeleteGame(item);
+                    }
+                }
+                else
+                {
+                    item.IsSelected = !item.IsSelected;
+                }
+                return;
             }
             else if (PanelSettings.Visibility == Visibility.Visible)
             {
@@ -1202,6 +1733,10 @@ public partial class SyncStatusWindow : Window
                     BtnGetKey_Click(this, new RoutedEventArgs());
                 }
                 else if (_settingsFocusIndex == 5)
+                {
+                    BtnSyncArtwork_Click(this, new RoutedEventArgs());
+                }
+                else if (_settingsFocusIndex == 6)
                 {
                     ComboLanguage.SelectedIndex = (ComboLanguage.SelectedIndex == 0) ? 1 : 0;
                 }
@@ -1230,10 +1765,17 @@ public partial class SyncStatusWindow : Window
             return;
         }
 
-        // Y (0x8000) = Select All / Deselect All
+        // Y (0x8000) = Delete (if synced) or Select All / Deselect All
         if ((newlyPressed & 0x8000) != 0 && PanelGames.Visibility == Visibility.Visible)
         {
-            ToggleSelectAll();
+            if (ListGames.SelectedItem is GameCardItem item && item.IsSynced)
+            {
+                RequestDeleteGame(item);
+            }
+            else
+            {
+                ToggleSelectAll();
+            }
             return;
         }
     }
@@ -1281,6 +1823,41 @@ public partial class SyncStatusWindow : Window
         public uint dwReserved2;
     }
 
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct JOYCAPSW
+    {
+        public ushort wMid;
+        public ushort wPid;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string szPname;
+        public uint wXmin;
+        public uint wXmax;
+        public uint wYmin;
+        public uint wYmax;
+        public uint wZmin;
+        public uint wZmax;
+        public uint wNumButtons;
+        public uint wPeriodMin;
+        public uint wPeriodMax;
+        public uint wRmin;
+        public uint wRmax;
+        public uint wUmin;
+        public uint wUmax;
+        public uint wVmin;
+        public uint wVmax;
+        public uint wCaps;
+        public uint wMaxAxes;
+        public uint wNumAxes;
+        public uint wMaxButtons;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string szRegKey;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+        public string szOEMVxD;
+    }
+
+    [DllImport("winmm.dll", EntryPoint = "joyGetDevCapsW", CharSet = CharSet.Unicode)]
+    private static extern uint joyGetDevCapsW(uint uJoyID, ref JOYCAPSW pjc, uint cbjc);
+
     [DllImport("winmm.dll")]
     private static extern uint joyGetPosEx(uint uJoyID, ref JOYINFOEX pji);
 
@@ -1289,6 +1866,11 @@ public partial class SyncStatusWindow : Window
         buttons = 0;
         dirX = 0;
         dirY = 0;
+
+        bool hasXInputDevice = false;
+        ushort xinputButtons = 0;
+        int xinputDirX = 0;
+        int xinputDirY = 0;
 
         // 1. Try XInput
         if (!_xinputFailed)
@@ -1318,89 +1900,158 @@ public partial class SyncStatusWindow : Window
                 if (err == 0)
                 {
                     ushort b = state.Gamepad.wButtons;
+                    int dX = 0;
+                    int dY = 0;
+
+                    if ((b & 0x0001) != 0 || state.Gamepad.sThumbLY > 16000) dY = -1;
+                    else if ((b & 0x0002) != 0 || state.Gamepad.sThumbLY < -16000) dY = 1;
+
+                    if ((b & 0x0004) != 0 || state.Gamepad.sThumbLX < -16000) dX = -1;
+                    else if ((b & 0x0008) != 0 || state.Gamepad.sThumbLX > 16000) dX = 1;
+
+                    // If active user input on XInput, return it immediately
+                    if (b != 0 || dX != 0 || dY != 0)
+                    {
+                        buttons = b;
+                        dirX = dX;
+                        dirY = dY;
+                        return true;
+                    }
+
+                    hasXInputDevice = true;
+                    xinputButtons = b;
+                    xinputDirX = dX;
+                    xinputDirY = dY;
+                    break;
+                }
+            }
+        }
+
+        // 2. Fallback to WinMM (PlayStation DualSense/DualShock & DirectInput controllers)
+        if (!_winmmFailed)
+        {
+            // First check cached device index if valid
+            if (_cachedWinmmJoyId >= 0 && _cachedWinmmJoyId < 16)
+            {
+                if (TryPollWinmmDevice((uint)_cachedWinmmJoyId, out ushort b, out int dX, out int dY))
+                {
                     buttons = b;
+                    dirX = dX;
+                    dirY = dY;
+                    return true;
+                }
+                _cachedWinmmJoyId = -1;
+            }
 
-                    if ((b & 0x0001) != 0 || state.Gamepad.sThumbLY > 16000) dirY = -1;
-                    else if ((b & 0x0002) != 0 || state.Gamepad.sThumbLY < -16000) dirY = 1;
-
-                    if ((b & 0x0004) != 0 || state.Gamepad.sThumbLX < -16000) dirX = -1;
-                    else if ((b & 0x0008) != 0 || state.Gamepad.sThumbLX > 16000) dirX = 1;
-
+            for (uint j = 0; j < 16; j++)
+            {
+                if (TryPollWinmmDevice(j, out ushort b, out int dX, out int dY))
+                {
+                    _cachedWinmmJoyId = (int)j;
+                    buttons = b;
+                    dirX = dX;
+                    dirY = dY;
                     return true;
                 }
             }
         }
 
-        // 2. Fallback to WinMM (PlayStation DualSense/DualShock & DirectInput)
-        if (!_winmmFailed)
+        if (hasXInputDevice)
         {
-            for (uint j = 0; j < 4; j++)
+            buttons = xinputButtons;
+            dirX = xinputDirX;
+            dirY = xinputDirY;
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryPollWinmmDevice(uint j, out ushort buttons, out int dirX, out int dirY)
+    {
+        buttons = 0;
+        dirX = 0;
+        dirY = 0;
+
+        try
+        {
+            var jc = new JOYCAPSW();
+            if (joyGetDevCapsW(j, ref jc, (uint)Marshal.SizeOf(jc)) != 0)
+                return false;
+
+            // Navigable game controllers must have at least 2 axes (X and Y analog thumbsticks).
+            // This filters out touchpads and bridge interfaces with 0 axes that report phantom zeros.
+            if (jc.wNumAxes < 2)
+                return false;
+
+            var ji = new JOYINFOEX
             {
-                try
+                dwSize = (uint)Marshal.SizeOf<JOYINFOEX>(),
+                dwFlags = 0x000000FF // JOY_RETURNALL
+            };
+
+            if (joyGetPosEx(j, ref ji) == 0)
+            {
+                // Ignore dead/dummy devices returning all zeros across all axes, buttons, and POV
+                if (ji.dwXpos == 0 && ji.dwYpos == 0 && ji.dwZpos == 0 && ji.dwRpos == 0 && ji.dwPOV == 0 && ji.dwButtons == 0)
+                    return false;
+
+                bool isPlayStation = (jc.wMid == 0x054C) || (GamepadDetector.DetectGamepadFamily() == GamepadType.PlayStation);
+                ushort mapped = 0;
+
+                if (isPlayStation)
                 {
-                    var ji = new JOYINFOEX
-                    {
-                        dwSize = (uint)Marshal.SizeOf<JOYINFOEX>(),
-                        dwFlags = 0x000000FF // JOY_RETURNALL
-                    };
-
-                    if (joyGetPosEx(j, ref ji) == 0)
-                    {
-                        ushort mapped = 0;
-                        if (_activeInputMode == ActiveInputMode.PlayStation)
-                        {
-                            if ((ji.dwButtons & 0x0002) != 0) mapped |= 0x1000; // Cross -> A
-                            if ((ji.dwButtons & 0x0004) != 0) mapped |= 0x2000; // Circle -> B
-                            if ((ji.dwButtons & 0x0001) != 0) mapped |= 0x4000; // Square -> X
-                            if ((ji.dwButtons & 0x0008) != 0) mapped |= 0x8000; // Triangle -> Y
-                        }
-                        else
-                        {
-                            if ((ji.dwButtons & 0x0001) != 0) mapped |= 0x1000;
-                            if ((ji.dwButtons & 0x0002) != 0) mapped |= 0x2000;
-                            if ((ji.dwButtons & 0x0004) != 0) mapped |= 0x4000;
-                            if ((ji.dwButtons & 0x0008) != 0) mapped |= 0x8000;
-                        }
-
-                        // L1 and R1 Bumpers (Button 5 = L1, Button 6 = R1)
-                        if ((ji.dwButtons & 0x0010) != 0) mapped |= 0x0100; // L1 / LB
-                        if ((ji.dwButtons & 0x0020) != 0) mapped |= 0x0200; // R1 / RB
-
-                        // Share / Options
-                        if ((ji.dwButtons & 0x0100) != 0) mapped |= 0x0020; // Back / Share
-                        if ((ji.dwButtons & 0x0200) != 0) mapped |= 0x0010; // Start / Options
-
-                        buttons = mapped;
-
-                        if (ji.dwPOV != 0xFFFF && ji.dwPOV <= 36000)
-                        {
-                            if (ji.dwPOV >= 31500 || ji.dwPOV <= 4500) dirY = -1;
-                            else if (ji.dwPOV >= 13500 && ji.dwPOV <= 22500) dirY = 1;
-
-                            if (ji.dwPOV >= 4500 && ji.dwPOV <= 13500) dirX = 1;
-                            else if (ji.dwPOV >= 22500 && ji.dwPOV <= 31500) dirX = -1;
-                        }
-
-                        if (dirY == 0)
-                        {
-                            if (ji.dwYpos < 16000) dirY = -1;
-                            else if (ji.dwYpos > 49000) dirY = 1;
-                        }
-                        if (dirX == 0)
-                        {
-                            if (ji.dwXpos < 16000) dirX = -1;
-                            else if (ji.dwXpos > 49000) dirX = 1;
-                        }
-
-                        return true;
-                    }
+                    if ((ji.dwButtons & 0x0002) != 0) mapped |= 0x1000; // Cross -> A
+                    if ((ji.dwButtons & 0x0004) != 0) mapped |= 0x2000; // Circle -> B
+                    if ((ji.dwButtons & 0x0001) != 0) mapped |= 0x4000; // Square -> X
+                    if ((ji.dwButtons & 0x0008) != 0) mapped |= 0x8000; // Triangle -> Y
                 }
-                catch
+                else
                 {
-                    _winmmFailed = true;
-                    break;
+                    if ((ji.dwButtons & 0x0001) != 0) mapped |= 0x1000;
+                    if ((ji.dwButtons & 0x0002) != 0) mapped |= 0x2000;
+                    if ((ji.dwButtons & 0x0004) != 0) mapped |= 0x4000;
+                    if ((ji.dwButtons & 0x0008) != 0) mapped |= 0x8000;
                 }
+
+                // L1 and R1 Bumpers (Button 5 = L1, Button 6 = R1)
+                if ((ji.dwButtons & 0x0010) != 0) mapped |= 0x0100; // L1 / LB
+                if ((ji.dwButtons & 0x0020) != 0) mapped |= 0x0200; // R1 / RB
+
+                // Share / Options
+                if ((ji.dwButtons & 0x0100) != 0) mapped |= 0x0020; // Back / Share
+                if ((ji.dwButtons & 0x0200) != 0) mapped |= 0x0010; // Start / Options
+
+                buttons = mapped;
+
+                // D-Pad via POV Hat (in hundredths of a degree: 0=Up, 9000=Right, 18000=Down, 27000=Left)
+                if (ji.dwPOV != 0xFFFF && ji.dwPOV <= 36000)
+                {
+                    if (ji.dwPOV >= 31500 || ji.dwPOV <= 4500) dirY = -1;
+                    else if (ji.dwPOV >= 13500 && ji.dwPOV <= 22500) dirY = 1;
+
+                    if (ji.dwPOV >= 4500 && ji.dwPOV <= 13500) dirX = 1;
+                    else if (ji.dwPOV >= 22500 && ji.dwPOV <= 31500) dirX = -1;
+                }
+
+                // Left Analog Stick (centered at 32767 with +/-16000 deadzone)
+                if (dirY == 0)
+                {
+                    if (ji.dwYpos < 16000) dirY = -1;
+                    else if (ji.dwYpos > 49000) dirY = 1;
+                }
+                if (dirX == 0)
+                {
+                    if (ji.dwXpos < 16000) dirX = -1;
+                    else if (ji.dwXpos > 49000) dirX = 1;
+                }
+
+                return true;
             }
+        }
+        catch
+        {
+            _winmmFailed = true;
         }
 
         return false;
@@ -1476,6 +2127,7 @@ public partial class SyncStatusWindow : Window
         "gog galaxy" or "gog" => isLight ? System.Windows.Media.Color.FromRgb(139, 61, 255) : System.Windows.Media.Color.FromRgb(180, 115, 255),
         "battle.net" or "battlenet" or "blizzard" => System.Windows.Media.Color.FromRgb(0, 174, 255),
         "xbox" or "microsoft store" or "game pass" => System.Windows.Media.Color.FromRgb(16, 124, 16),
+        "manual" or "external" or "steam shortcut" or "acceso directo" => isLight ? System.Windows.Media.Color.FromRgb(30, 90, 150) : System.Windows.Media.Color.FromRgb(102, 175, 255),
         _ => isLight ? System.Windows.Media.Color.FromRgb(100, 100, 100) : System.Windows.Media.Color.FromRgb(160, 160, 160)
     };
 }
@@ -1502,6 +2154,36 @@ public class GameCardItem : INotifyPropertyChanged
             _isSynced = value;
             OnPropertyChanged(nameof(IsSynced));
             OnPropertyChanged(nameof(CheckBoxVisibility));
+            OnPropertyChanged(nameof(DeleteButtonVisibility));
+        }
+    }
+
+    private bool _isSyncing;
+    public bool IsSyncing
+    {
+        get => _isSyncing;
+        set
+        {
+            _isSyncing = value;
+            OnPropertyChanged(nameof(IsSyncing));
+            OnPropertyChanged(nameof(SyncingVisibility));
+            OnPropertyChanged(nameof(NormalStatusVisibility));
+            OnPropertyChanged(nameof(CheckBoxVisibility));
+            OnPropertyChanged(nameof(DeleteButtonVisibility));
+        }
+    }
+
+    public Visibility SyncingVisibility => IsSyncing ? Visibility.Visible : Visibility.Collapsed;
+    public Visibility NormalStatusVisibility => IsSyncing ? Visibility.Collapsed : Visibility.Visible;
+
+    private double _syncSpinAngle;
+    public double SyncSpinAngle
+    {
+        get => _syncSpinAngle;
+        set
+        {
+            _syncSpinAngle = value;
+            OnPropertyChanged(nameof(SyncSpinAngle));
         }
     }
 
@@ -1516,7 +2198,36 @@ public class GameCardItem : INotifyPropertyChanged
         }
     }
 
-    public Visibility CheckBoxVisibility => IsSynced ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility CheckBoxVisibility => (IsSynced || IsSyncing) ? Visibility.Collapsed : Visibility.Visible;
+    public Visibility DeleteButtonVisibility => (IsSynced && !IsSyncing) ? Visibility.Visible : Visibility.Collapsed;
+    public string DeleteToolTip { get; set; } = "Eliminar de Steam";
+    public string ChooseArtworkToolTip { get; set; } = "Elegir carátulas";
+
+    private bool _isDeleteFocused;
+    public bool IsDeleteFocused
+    {
+        get => _isDeleteFocused;
+        set
+        {
+            _isDeleteFocused = value;
+            OnPropertyChanged(nameof(IsDeleteFocused));
+            OnPropertyChanged(nameof(DeleteButtonBgBrush));
+            OnPropertyChanged(nameof(DeleteButtonBorderBrush));
+            OnPropertyChanged(nameof(DeleteIconBrush));
+        }
+    }
+
+    public System.Windows.Media.Brush DeleteButtonBgBrush => _isDeleteFocused
+        ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(50, 232, 17, 35))
+        : System.Windows.Media.Brushes.Transparent;
+
+    public System.Windows.Media.Brush DeleteButtonBorderBrush => _isDeleteFocused
+        ? new SolidColorBrush(System.Windows.Media.Color.FromArgb(180, 232, 17, 35))
+        : System.Windows.Media.Brushes.Transparent;
+
+    public System.Windows.Media.Brush DeleteIconBrush => _isDeleteFocused
+        ? new SolidColorBrush(System.Windows.Media.Color.FromRgb(255, 90, 90))
+        : new SolidColorBrush(System.Windows.Media.Color.FromRgb(150, 150, 150));
 
     private string _statusGlyph = "";
     public string StatusGlyph

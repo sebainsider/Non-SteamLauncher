@@ -124,6 +124,56 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Critical / Destructive Accent Button Style -->
+        <Style x:Key="FluentCriticalButtonStyle" TargetType="Button">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="16,0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="BtnBorder" CornerRadius="5" Background="{DynamicResource CriticalBrush}" BorderBrush="{DynamicResource CriticalBrush}" BorderThickness="1" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="White"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BtnBorder" Property="Background" Value="{DynamicResource CriticalHoverBrush}"/>
+                                <Setter TargetName="BtnBorder" Property="BorderBrush" Value="{DynamicResource CriticalHoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Subtle Icon Button Style -->
+        <Style x:Key="FluentIconButtonStyle" TargetType="Button">
+            <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Border" CornerRadius="4" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource CardHoverBrush}"/>
+                                <Setter TargetName="Border" Property="BorderBrush" Value="{DynamicResource CardStrokeBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Border" Property="Background" Value="{DynamicResource CardBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid Background="{DynamicResource BackgroundBrush}">
@@ -190,16 +240,40 @@
                     <RowDefinition Height="*"/>    <!-- Games List -->
                 </Grid.RowDefinitions>
 
-                <!-- Clean, Quiet Status Strip -->
-                <Border Grid.Row="0" CornerRadius="5" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" Padding="12,6" Margin="0,0,0,6">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock x:Name="TxtInfoIcon" Text="&#xE73E;" 
-                                   FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
-                                   FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" 
-                                   Foreground="{DynamicResource InfoIconBrush}"/>
-                        <TextBlock x:Name="TxtInfoMessage" Text="4 juegos sincronizados en Steam" 
-                                   FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
-                    </StackPanel>
+                <!-- Clean, Quiet Status Strip with Fluent Indeterminate Progress Bar -->
+                <Border Grid.Row="0" CornerRadius="5" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" Margin="0,0,0,6" ClipToBounds="True">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="12,6">
+                            <TextBlock x:Name="TxtInfoIcon" Text="&#xE73E;" 
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
+                                       FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" 
+                                       Foreground="{DynamicResource InfoIconBrush}"/>
+                            <!-- Spinning info sync glyph -->
+                            <TextBlock x:Name="TxtInfoSyncSpin" Text="&#xE895;" 
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
+                                       FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" 
+                                       Foreground="{DynamicResource AccentBrush}"
+                                       RenderTransformOrigin="0.5,0.5"
+                                       Visibility="Collapsed">
+                                <TextBlock.RenderTransform>
+                                    <RotateTransform x:Name="InfoSyncRotate" Angle="0"/>
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
+                            <TextBlock x:Name="TxtInfoMessage" Text="4 juegos sincronizados en Steam" 
+                                       FontSize="11.5" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Fluent 2 Slim Indeterminate ProgressBar at bottom edge of status strip -->
+                        <ProgressBar x:Name="ProgressSync" Grid.Row="1" Height="2" 
+                                     IsIndeterminate="False" Visibility="Collapsed"
+                                     Background="Transparent" BorderThickness="0"
+                                     Foreground="{DynamicResource AccentBrush}"/>
+                    </Grid>
                 </Border>
 
                 <!-- Compact Game Rows (Fluent List) -->
@@ -236,6 +310,7 @@
                                             <ColumnDefinition Width="Auto"/> <!-- Thumbnail (32x32) -->
                                             <ColumnDefinition Width="*"/>    <!-- Full Title & Launcher Name -->
                                             <ColumnDefinition Width="Auto"/> <!-- Discrete Status (NO pill border) -->
+                                            <ColumnDefinition Width="Auto"/> <!-- Delete / Remove Action Button -->
                                         </Grid.ColumnDefinitions>
 
                                         <!-- Selection Checkbox (Visible ONLY when pending to sync) -->
@@ -276,10 +351,66 @@
 
                                         <!-- Discrete Status (Subtle text + small icon, NOT a button pill) -->
                                         <StackPanel Grid.Column="3" Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,4,0">
-                                            <TextBlock Text="{Binding StatusGlyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
-                                                       FontSize="11" Foreground="{Binding StatusBrush}" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                            <Grid VerticalAlignment="Center" Margin="0,0,5,0">
+                                                <!-- Normal status glyph (e.g. checkmark \uE73E or subtle dot) -->
+                                                <TextBlock Text="{Binding StatusGlyph}" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
+                                                           FontSize="11" Foreground="{Binding StatusBrush}" VerticalAlignment="Center"
+                                                           Visibility="{Binding NormalStatusVisibility}"/>
+                                                <!-- Spinning Sync Glyph (\uE895) when syncing -->
+                                                <TextBlock x:Name="TxtItemSyncSpin" Text="&#xE895;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
+                                                           FontSize="11" Foreground="{Binding StatusBrush}" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                           RenderTransformOrigin="0.5,0.5"
+                                                           Visibility="{Binding SyncingVisibility}">
+                                                    <TextBlock.RenderTransform>
+                                                        <RotateTransform Angle="{Binding SyncSpinAngle}"/>
+                                                    </TextBlock.RenderTransform>
+                                                </TextBlock>
+                                            </Grid>
                                             <TextBlock Text="{Binding StatusText}" FontSize="11.5" FontWeight="Normal" 
                                                        Foreground="{Binding StatusBrush}" VerticalAlignment="Center"/>
+                                        </StackPanel>
+
+                                        <!-- Synced Game Action Buttons (Artwork Picker + Remove) -->
+                                        <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center" Visibility="{Binding DeleteButtonVisibility}">
+                                            <!-- Choose Artwork Button -->
+                                            <Border Width="28" Height="28"
+                                                    Margin="8,0,0,0"
+                                                    CornerRadius="4"
+                                                    Background="Transparent"
+                                                    BorderBrush="Transparent"
+                                                    BorderThickness="1">
+                                                <Button Width="26" Height="26"
+                                                        Padding="0"
+                                                        Cursor="Hand"
+                                                        ToolTip="{Binding ChooseArtworkToolTip}"
+                                                        Style="{StaticResource FluentIconButtonStyle}"
+                                                        Tag="{Binding}"
+                                                        Click="BtnChooseArtwork_Click">
+                                                    <TextBlock Text="&#xEB9F;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif"
+                                                               FontSize="12" Foreground="{DynamicResource TextSecondaryBrush}"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Button>
+                                            </Border>
+
+                                            <!-- Delete / Remove Action Button -->
+                                            <Border Width="28" Height="28" 
+                                                    Margin="4,0,0,0" 
+                                                    CornerRadius="4"
+                                                    Background="{Binding DeleteButtonBgBrush}"
+                                                    BorderBrush="{Binding DeleteButtonBorderBrush}"
+                                                    BorderThickness="1">
+                                                <Button Width="26" Height="26" 
+                                                        Padding="0" 
+                                                        Cursor="Hand"
+                                                        ToolTip="{Binding DeleteToolTip}"
+                                                        Style="{StaticResource FluentIconButtonStyle}"
+                                                        Tag="{Binding}" 
+                                                        Click="BtnDeleteGame_Click">
+                                                    <TextBlock Text="&#xE74D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
+                                                               FontSize="12" Foreground="{Binding DeleteIconBrush}" 
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Button>
+                                            </Border>
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -331,7 +462,20 @@
                         </StackPanel>
                     </Border>
 
-                    <!-- Setting 3: Language Preference -->
+                    <!-- Setting 3: Sync & Choose Artwork -->
+                    <Border x:Name="BorderSettingSyncArtwork" CornerRadius="6" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" Padding="14,10" Margin="0,0,0,6">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock x:Name="TxtSyncArtworkTitle" Grid.Column="0" Text="Personalizar carátulas en Steam" FontWeight="SemiBold" FontSize="12.5" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                            <Button x:Name="BtnSyncArtwork" Grid.Column="1" Content="Sincronizar y elegir carátulas" Style="{StaticResource FluentSecondaryButtonStyle}" Height="28" Padding="12,0" Click="BtnSyncArtwork_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Setting 4: Language Preference -->
                     <Border x:Name="BorderSettingLanguage" CornerRadius="6" Background="{DynamicResource LayerBrush}" BorderBrush="{DynamicResource CardStrokeBrush}" BorderThickness="1" Padding="14,10">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -369,6 +513,15 @@
                     <!-- Primary Action Button (Only visible when pending games exist) -->
                     <Button x:Name="BtnPrimaryAction" Style="{StaticResource FluentAccentButtonStyle}" Margin="0,0,8,0" Click="BtnPrimaryAction_Click">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="IconPrimarySpin" Text="&#xE895;" 
+                                       FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
+                                       FontSize="12" Foreground="White" Margin="0,0,6,0" VerticalAlignment="Center"
+                                       RenderTransformOrigin="0.5,0.5"
+                                       Visibility="Collapsed">
+                                <TextBlock.RenderTransform>
+                                    <RotateTransform x:Name="PrimarySpinRotate" Angle="0"/>
+                                </TextBlock.RenderTransform>
+                            </TextBlock>
                             <ContentControl x:Name="BadgePrimaryAction" VerticalAlignment="Center"/>
                             <TextBlock x:Name="TxtPrimaryAction" Text="Sincronizar" Foreground="White" VerticalAlignment="Center" FontWeight="SemiBold"/>
                         </StackPanel>
@@ -384,5 +537,61 @@
                 </StackPanel>
             </Grid>
         </Border>
+
+        <!-- Confirmation Dialog Overlay (Fluent 2 ContentDialog) -->
+        <Grid x:Name="DialogOverlay" Grid.Row="0" Grid.RowSpan="3" Background="#7F000000" Visibility="Collapsed">
+            <Border HorizontalAlignment="Center" VerticalAlignment="Center" 
+                    Width="440" MaxWidth="500" CornerRadius="8" 
+                    Background="{DynamicResource CardBrush}" 
+                    BorderBrush="{DynamicResource CardStrokeBrush}" 
+                    BorderThickness="1" 
+                    Padding="24">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <TextBlock Text="&#xE74D;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets, sans-serif" 
+                                   FontSize="18" Foreground="{DynamicResource CriticalBrush}" 
+                                   Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="TxtDialogTitle" Text="¿Eliminar de Steam?" 
+                                   FontSize="16" FontWeight="SemiBold" 
+                                   Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="TxtDialogMessage" 
+                               Text="¿Estás seguro de que deseas eliminar este acceso directo de Steam?" 
+                               FontSize="13" Foreground="{DynamicResource TextSecondaryBrush}" 
+                               TextWrapping="Wrap" Margin="0,0,0,20"/>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Confirm Delete Button -->
+                        <Button x:Name="BtnConfirmDelete" Grid.Column="1" 
+                                Height="32" Padding="14,0"
+                                Style="{StaticResource FluentCriticalButtonStyle}" 
+                                Margin="0,0,8,0" Click="BtnConfirmDelete_Click">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ContentControl x:Name="BadgeConfirmDelete" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtConfirmDelete" Text="Eliminar" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                        <!-- Cancel Delete Button -->
+                        <Button x:Name="BtnCancelDelete" Grid.Column="2" 
+                                Height="32" Padding="14,0"
+                                Style="{StaticResource FluentSecondaryButtonStyle}" 
+                                Click="BtnCancelDelete_Click">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <ContentControl x:Name="BadgeCancelDelete" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="TxtCancelDelete" Text="Cancelar" FontWeight="Normal" FontSize="12" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

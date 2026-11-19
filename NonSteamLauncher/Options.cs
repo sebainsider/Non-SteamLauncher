@@ -10,6 +10,8 @@ public class Options
     public bool DisableOverlay { get; set; }
     public bool SyncSteam { get; set; }
     public bool ListGames { get; set; }
+    public bool ListSteamShortcuts { get; set; }
+    public string? RemoveShortcutTitle { get; set; }
     public string? SteamPath { get; set; }
     public string? SteamGridDbApiKey { get; set; }
     public bool SkipArtwork { get; set; }
@@ -76,6 +78,20 @@ public class Options
                 arg.Equals("--scan", StringComparison.OrdinalIgnoreCase))
             {
                 options.ListGames = true;
+                continue;
+            }
+
+            if (arg.Equals("--list-steam", StringComparison.OrdinalIgnoreCase) ||
+                arg.Equals("--list-shortcuts", StringComparison.OrdinalIgnoreCase))
+            {
+                options.ListSteamShortcuts = true;
+                continue;
+            }
+
+            if (TryParseOption(arg, "--remove-shortcut", "--remove", args, ref i, out var removeValue) ||
+                TryParseOption(arg, "--delete-shortcut", "--delete", args, ref i, out removeValue))
+            {
+                options.RemoveShortcutTitle = removeValue;
                 continue;
             }
 
@@ -175,7 +191,7 @@ public class Options
             return (null, $"Unrecognized argument: '{arg}'");
         }
 
-        if (!options.ShowHelp && !options.SyncSteam && !options.ListGames && string.IsNullOrWhiteSpace(options.LaunchCommand))
+        if (!options.ShowHelp && !options.SyncSteam && !options.ListGames && !options.ListSteamShortcuts && string.IsNullOrEmpty(options.RemoveShortcutTitle) && string.IsNullOrWhiteSpace(options.LaunchCommand))
         {
             if (options.Silent || options.DryRun || !string.IsNullOrEmpty(options.SteamGridDbApiKey))
             {
@@ -183,7 +199,7 @@ public class Options
             }
             else
             {
-                return (null, "Missing required argument: --launch <command or URI>, or specify --sync-steam / --list-games");
+                return (null, "Missing required argument: --launch <command or URI>, or specify --sync-steam / --list-games / --list-steam / --remove <title>");
             }
         }
 
@@ -230,6 +246,8 @@ public class Options
         Console.WriteLine("  NonSteamLauncher --launch <command or URI> [options]");
         Console.WriteLine("  NonSteamLauncher --sync-steam [options]");
         Console.WriteLine("  NonSteamLauncher --list-games [options]");
+        Console.WriteLine("  NonSteamLauncher --list-steam [options]");
+        Console.WriteLine("  NonSteamLauncher --remove <game title> [options]");
         Console.WriteLine();
         Console.WriteLine("Launch & Tracking Options:");
         Console.WriteLine("  --launch, -l <command/URI>       Command line or URI to launch the game.");
@@ -247,6 +265,8 @@ public class Options
         Console.WriteLine("  --sync-steam, --sync             Automatically scan installed games across launchers (Epic, EA,");
         Console.WriteLine("                                   Ubisoft, Battle.net, GOG) and add them to Steam shortcuts.vdf.");
         Console.WriteLine("  --list-games, --scan             Scan and display installed games across launchers without modifying Steam.");
+        Console.WriteLine("  --list-steam, --list-shortcuts   Scan and list all Non-Steam shortcuts currently present in Steam (including manual).");
+        Console.WriteLine("  --remove, --delete <title>       Remove a Non-Steam shortcut and its artwork from Steam shortcuts.vdf.");
         Console.WriteLine("  --sgdb-key, -k <key>             (Optional) Save and use a SteamGridDB API Key for automatic artwork & icons.");
         Console.WriteLine("  --no-artwork                     (Optional) Skip downloading covers, heroes, logos, and icons during sync.");
         Console.WriteLine("  --settings <path>                (Optional) Custom path to settings.json file.");

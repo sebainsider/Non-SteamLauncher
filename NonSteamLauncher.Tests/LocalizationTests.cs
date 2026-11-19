@@ -24,6 +24,8 @@ public class LocalizationTests
             Assert.Equal(expectedCardHeader, strings.CardHeaderAdded);
             Assert.False(string.IsNullOrEmpty(strings.WindowTitle));
             Assert.False(string.IsNullOrEmpty(strings.HeaderSuccess));
+            Assert.False(string.IsNullOrEmpty(strings.StatusSyncing));
+            Assert.False(string.IsNullOrEmpty(strings.StatusSyncingGame));
         }
         finally
         {

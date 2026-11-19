@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="NonSteamLauncher/Assets/Icons/NonSteamLauncher.png" width="128" alt="Non-Steam Launcher Icon" /><br>
-  <strong>v1.9.0</strong><br>
+  <strong>v1.10.0</strong><br>
   <em>El puente perfecto entre launchers de terceros y Steam.</em>
 </p>
 
@@ -57,6 +57,12 @@ NonSteamLauncher.exe --silent
 # Listar los juegos detectados en consola sin modificar Steam
 NonSteamLauncher.exe --list-games
 
+# Listar todos los accesos directos existentes en Steam (incluyendo manuales)
+NonSteamLauncher.exe --list-steam
+
+# Eliminar un acceso directo y sus carátulas de Steam
+NonSteamLauncher.exe --remove "Nombre del Juego"
+
 # Sincronizar sin descargar arte/imágenes
 NonSteamLauncher.exe --no-artwork
 ```
@@ -77,7 +83,9 @@ NonSteamLauncher.exe "com.epicgames.launcher://apps/Item?action=launch" --close-
 | Parámetro | Alias | Descripción |
 |---|---|---|
 | `--sync-steam` | `--sync` | Escanea y sincroniza los juegos instalados con Steam (*por defecto si se ejecuta sin argumentos*). |
-| `--list-games` | `--scan` | Muestra en consola los juegos detectados sin modificar Steam. |
+| `--list-games` | `--scan` | Muestra en consola los juegos detectados en launchers sin modificar Steam. |
+| `--list-steam` | `--list-shortcuts` | Muestra en consola todos los accesos directos de Steam (incluidos manuales y externos). |
+| `--remove` | `--delete`, `--remove-shortcut` | Elimina un acceso directo y sus carátulas de `shortcuts.vdf` en Steam. |
 | `--sgdb-key` | `-k`, `--api-key` | Guarda y utiliza tu API Key de SteamGridDB para descargar arte oficial. |
 | `--no-artwork` | `--no-images` | Omite la descarga de carátulas, heroes, logos e iconos. |
 | `--silent` | `-q`, `--quiet`, `--no-ui` | Modo silencioso sin ventana de diálogo emergente. |

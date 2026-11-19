@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="NonSteamLauncher/Assets/Icons/NonSteamLauncher.png" width="128" alt="Non-Steam Launcher Icon" /><br>
-  <strong>v1.9.0</strong><br>
+  <strong>v1.10.0</strong><br>
   <em>The seamless bridge between third-party PC launchers and Steam.</em>
 </p>
 
@@ -57,6 +57,12 @@ NonSteamLauncher.exe --silent
 # Preview detected games in terminal without writing to Steam
 NonSteamLauncher.exe --list-games
 
+# List all Non-Steam shortcuts currently present in Steam (including manual)
+NonSteamLauncher.exe --list-steam
+
+# Remove a shortcut and its artwork from Steam
+NonSteamLauncher.exe --remove "Game Title"
+
 # Sync shortcuts without downloading artwork/images
 NonSteamLauncher.exe --no-artwork
 ```
@@ -78,6 +84,8 @@ NonSteamLauncher.exe "com.epicgames.launcher://apps/Item?action=launch" --close-
 |---|---|---|
 | `--sync-steam` | `--sync` | Scans and syncs installed games into Steam (*default when run without arguments*). |
 | `--list-games` | `--scan` | Displays detected games in terminal without altering Steam. |
+| `--list-steam` | `--list-shortcuts` | Lists all Non-Steam shortcuts currently present in Steam (including manual/external). |
+| `--remove` | `--delete`, `--remove-shortcut` | Removes a shortcut and its downloaded artwork from Steam `shortcuts.vdf`. |
 | `--sgdb-key` | `-k`, `--api-key` | Saves and uses your SteamGridDB API key for automatic artwork downloads. |
 | `--no-artwork` | `--no-images` | Skips downloading covers, heroes, logos, and icons. |
 | `--silent` | `-q`, `--quiet`, `--no-ui` | Runs silently without displaying the completion dialog. |

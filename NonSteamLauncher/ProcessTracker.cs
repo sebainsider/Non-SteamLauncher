@@ -261,7 +261,7 @@ public class DefaultProcessProvider : IProcessProvider
             var psi = new ProcessStartInfo
             {
                 FileName = "taskkill",
-                Arguments = $"/F /T /IM {procName}.exe",
+                Arguments = $"/F /T /IM \"{procName}.exe\"",
                 CreateNoWindow = true,
                 UseShellExecute = false
             };
@@ -279,8 +279,10 @@ public class DefaultProcessProvider : IProcessProvider
         if (string.IsNullOrWhiteSpace(launchCommand))
             return Array.Empty<string>();
 
-        if (launchCommand.Contains("epic", StringComparison.OrdinalIgnoreCase) ||
-            launchCommand.Contains("epicgames", StringComparison.OrdinalIgnoreCase))
+        string clean = launchCommand.Trim('"', '\'');
+
+        if (clean.StartsWith("com.epicgames.launcher://", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("EpicGamesLauncher", StringComparison.OrdinalIgnoreCase))
         {
             return new[]
             {
@@ -301,33 +303,43 @@ public class DefaultProcessProvider : IProcessProvider
                 "EasyAntiCheat_EOS"
             };
         }
-        if (launchCommand.Contains("origin", StringComparison.OrdinalIgnoreCase) ||
-            launchCommand.Contains("ea", StringComparison.OrdinalIgnoreCase))
+        if (clean.StartsWith("origin2://", StringComparison.OrdinalIgnoreCase) ||
+            clean.StartsWith("origin://", StringComparison.OrdinalIgnoreCase) ||
+            clean.StartsWith("eadm://", StringComparison.OrdinalIgnoreCase) ||
+            clean.StartsWith("ea://", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("EADesktop", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("EALauncher", StringComparison.OrdinalIgnoreCase))
         {
             return new[] { "EADesktop", "EABackgroundService", "EAWebKit", "EALauncher", "EACrashReporter", "EACoreServer", "Origin", "OriginClientService", "OriginWebHelperService" };
         }
-        if (launchCommand.Contains("uplay", StringComparison.OrdinalIgnoreCase) ||
-            launchCommand.Contains("ubisoft", StringComparison.OrdinalIgnoreCase))
+        if (clean.StartsWith("uplay://", StringComparison.OrdinalIgnoreCase) ||
+            clean.StartsWith("ubisoft://", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("UbisoftConnect", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("UbisoftGameLauncher", StringComparison.OrdinalIgnoreCase))
         {
             return new[] { "UbisoftConnect", "upc", "Uplay", "UplayWebCore", "UbisoftGameLauncher", "UbisoftGameLauncher64", "UplayService" };
         }
-        if (launchCommand.Contains("battlenet", StringComparison.OrdinalIgnoreCase))
+        if (clean.StartsWith("battlenet://", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("Battle.net", StringComparison.OrdinalIgnoreCase))
         {
             return new[] { "Battle.net", "Agent" };
         }
-        if (launchCommand.Contains("gog", StringComparison.OrdinalIgnoreCase) ||
-            launchCommand.Contains("galaxy", StringComparison.OrdinalIgnoreCase))
+        if (clean.StartsWith("goggalaxy://", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("GalaxyClient", StringComparison.OrdinalIgnoreCase))
         {
-            return new[] { "GalaxyClient", "GalaxyClientService", "GalaxyCommunication", "GalaxyOverlay" };
+            return new[] { "GalaxyClient", "GalaxyClientService", "GalaxyCommunication", "GalaxyOverlay", "GOG Galaxy Notifications Renderer", "GalaxyClient Helper" };
         }
-        if (launchCommand.Contains("xbox", StringComparison.OrdinalIgnoreCase) ||
-            launchCommand.Contains("XboxGames", StringComparison.OrdinalIgnoreCase) ||
-            launchCommand.Contains("gamelaunchhelper", StringComparison.OrdinalIgnoreCase))
+        if (clean.StartsWith("xbox://", StringComparison.OrdinalIgnoreCase) ||
+            clean.StartsWith("ms-xbl-", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("XboxGames", StringComparison.OrdinalIgnoreCase) ||
+            clean.Contains("gamelaunchhelper", StringComparison.OrdinalIgnoreCase))
         {
             return new[] { "XboxPcApp", "XboxApp" };
         }
 
-        return new[] { "EpicGamesLauncher", "EpicWebHelper", "EpicOnlineServicesHost", "EpicOnlineServices", "EADesktop", "UbisoftConnect", "GalaxyClient", "Battle.net" };
+        // Direct executables (e.g., DRM-free GOG games like witcher3.exe or standalone games)
+        // do not invoke a third-party store launcher, so no launcher should be closed.
+        return Array.Empty<string>();
     }
 
 }
@@ -366,18 +378,25 @@ public class ProcessTracker
             return 1;
         }
 
-        // 4. Close launcher if --close-launcher flag is enabled OR if launcher was newly started by NonSteamLauncher
-        bool wasLauncherRunningInitially = CheckIfLauncherWasRunningInitially(initialSnapshot, options.LaunchCommand);
-        if (options.CloseLauncher || !wasLauncherRunningInitially)
+        // 4. Close ONLY the specific launcher associated with this game, and ONLY if --close-launcher was requested
+        if (options.CloseLauncher)
         {
-            if (options.SyncDelaySeconds > 0)
+            var launcherTargets = DefaultProcessProvider.GetLauncherProcessNames(options.LaunchCommand);
+            if (launcherTargets.Length > 0)
             {
-                _logger.LogInfo($"Waiting {options.SyncDelaySeconds}s for launcher cloud saves to sync before closing...");
-                await Task.Delay(TimeSpan.FromSeconds(options.SyncDelaySeconds), cancellationToken);
-            }
+                if (options.SyncDelaySeconds > 0)
+                {
+                    _logger.LogInfo($"Waiting {options.SyncDelaySeconds}s for launcher cloud saves to sync before closing...");
+                    await Task.Delay(TimeSpan.FromSeconds(options.SyncDelaySeconds), cancellationToken);
+                }
 
-            _logger.LogInfo("Closing third-party launcher processes (Epic Games Launcher, Epic Online Services, etc.)...");
-            _provider.CloseLauncherProcesses(options.LaunchCommand);
+                _logger.LogInfo($"Closing launcher processes associated with '{options.LaunchCommand}'...");
+                _provider.CloseLauncherProcesses(options.LaunchCommand);
+            }
+            else
+            {
+                _logger.LogDebug("Direct executable launch: no third-party launcher needs to be closed.");
+            }
         }
 
         _logger.LogInfo("Game session ended. Non-Steam Launcher exiting with code 0.");
@@ -385,13 +404,52 @@ public class ProcessTracker
     }
 
 
+    public static string? InferTargetProcessName(string? launchCommand)
+    {
+        if (string.IsNullOrWhiteSpace(launchCommand))
+            return null;
+
+        string clean = launchCommand.Trim('"', '\'');
+
+        if (clean.Contains("://", StringComparison.Ordinal))
+            return null;
+
+        if (!clean.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        string name = Path.GetFileNameWithoutExtension(clean);
+        if (string.IsNullOrWhiteSpace(name))
+            return null;
+
+        if (LauncherFilter.IsLauncherOrSystemProcess(name))
+            return null;
+
+        if (name.Contains("launcher", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("bootstrap", StringComparison.OrdinalIgnoreCase) ||
+            name.Contains("setup", StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return name;
+    }
+
     public async Task<bool> TrackGameSessionAsync(ProcessSnapshot initialSnapshot, Options options, CancellationToken cancellationToken)
     {
         var startTime = DateTime.UtcNow;
         var timeoutSpan = TimeSpan.FromSeconds(options.TimeoutSeconds);
 
+        string? effectiveProcessName = !string.IsNullOrEmpty(options.ProcessName)
+            ? options.ProcessName
+            : InferTargetProcessName(options.LaunchCommand);
+
+        if (string.IsNullOrEmpty(options.ProcessName) && !string.IsNullOrEmpty(effectiveProcessName))
+        {
+            _logger.LogInfo($"Inferred target game process from executable: '{effectiveProcessName}'");
+        }
+
         var trackedGamePids = new HashSet<int>();
-        string? primaryProcessName = options.ProcessName;
+        string? primaryProcessName = effectiveProcessName;
         bool hasGameStarted = false;
 
         while (!cancellationToken.IsCancellationRequested)
@@ -408,10 +466,10 @@ public class ProcessTracker
                 .Where(p => !LauncherFilter.IsLauncherOrSystemProcess(p.ProcessName))
                 .ToList();
 
-            if (!string.IsNullOrEmpty(options.ProcessName))
+            if (!string.IsNullOrEmpty(effectiveProcessName))
             {
                 gameCandidates = gameCandidates
-                    .Where(p => p.ProcessName.Equals(options.ProcessName, StringComparison.OrdinalIgnoreCase))
+                    .Where(p => p.ProcessName.Equals(effectiveProcessName, StringComparison.OrdinalIgnoreCase))
                     .ToList();
             }
 
@@ -431,9 +489,9 @@ public class ProcessTracker
                 {
                     hasGameStarted = true;
                 }
-                else if (!string.IsNullOrEmpty(options.ProcessName) && _provider.GetRunningInstanceCount(options.ProcessName) > 0)
+                else if (!string.IsNullOrEmpty(effectiveProcessName) && _provider.GetRunningInstanceCount(effectiveProcessName) > 0)
                 {
-                    _logger.LogInfo($"Detected running instance of explicit process: '{options.ProcessName}'");
+                    _logger.LogInfo($"Detected running instance of explicit process: '{effectiveProcessName}'");
                     hasGameStarted = true;
                 }
                 else
@@ -478,10 +536,10 @@ public class ProcessTracker
                     .Where(p => !LauncherFilter.IsLauncherOrSystemProcess(p.ProcessName))
                     .ToList();
 
-                if (!string.IsNullOrEmpty(options.ProcessName))
+                if (!string.IsNullOrEmpty(effectiveProcessName))
                 {
                     recheckGame = recheckGame
-                        .Where(p => p.ProcessName.Equals(options.ProcessName, StringComparison.OrdinalIgnoreCase))
+                        .Where(p => p.ProcessName.Equals(effectiveProcessName, StringComparison.OrdinalIgnoreCase))
                         .ToList();
                 }
 

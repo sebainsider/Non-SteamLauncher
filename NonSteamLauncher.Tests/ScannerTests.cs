@@ -183,6 +183,73 @@ public class ScannerTests
     }
 
     [Fact]
+    public void GogScanner_ResolvesActualGameExe_WhenRegistryPointsToREDprelauncher()
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), "GogWitcherTest_" + Guid.NewGuid().ToString("N"));
+        string binDir = Path.Combine(tempDir, "bin", "x64_dx12");
+        Directory.CreateDirectory(binDir);
+
+        try
+        {
+            string prelauncherExe = Path.Combine(tempDir, "REDprelauncher.exe");
+            string actualGameExe = Path.Combine(binDir, "witcher3.exe");
+            string gogIcon = Path.Combine(tempDir, "goggame-1495134320.ico");
+            File.WriteAllText(prelauncherExe, "stub_prelauncher");
+            File.WriteAllText(actualGameExe, "stub_witcher3");
+            File.WriteAllText(gogIcon, "stub_icon");
+
+            string infoJson = """
+            {
+                "gameId": "1495134320",
+                "name": "The Witcher 3: Wild Hunt - Game of the Year Edition",
+                "playTasks": [
+                    {
+                        "name": "The Witcher 3 - Wild Hunt",
+                        "type": "FileTask",
+                        "isPrimary": true,
+                        "path": "REDprelauncher.exe",
+                        "category": "launcher"
+                    },
+                    {
+                        "name": "The Witcher 3 - Wild Hunt",
+                        "type": "FileTask",
+                        "path": "bin/x64_dx12/witcher3.exe",
+                        "workingDir": "bin/x64_dx12",
+                        "category": "game"
+                    }
+                ]
+            }
+            """;
+            File.WriteAllText(Path.Combine(tempDir, "goggame-1495134320.info"), infoJson);
+
+            var mockRegistry = new MockRegistryReader();
+            mockRegistry.AddSubKey(@"HKLM\SOFTWARE\WOW6432Node\GOG.com\Games", "1495134320");
+            mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\1495134320", "gameName", "The Witcher 3: Wild Hunt - Game of the Year Edition");
+            mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\1495134320", "exe", prelauncherExe);
+            mockRegistry.AddValue(@"HKLM\SOFTWARE\WOW6432Node\GOG.com\Games\1495134320", "path", tempDir);
+
+            var scanner = new GogScanner(mockRegistry);
+            var games = scanner.Scan();
+
+            Assert.Single(games);
+            var witcher = games[0];
+            Assert.Equal("The Witcher 3: Wild Hunt - Game of the Year Edition", witcher.Title);
+            Assert.Equal("GOG Galaxy", witcher.Launcher);
+            Assert.Equal(actualGameExe, witcher.ExecutablePath);
+            Assert.Equal(actualGameExe, witcher.LaunchUri);
+            Assert.Equal(binDir, witcher.InstallDirectory);
+            Assert.Equal(gogIcon, witcher.IconPath);
+        }
+        finally
+        {
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+            }
+        }
+    }
+
+    [Fact]
     public void EAAppScanner_DiscoversGameFromRegistry()
     {
         var mockRegistry = new MockRegistryReader();

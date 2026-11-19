@@ -52,7 +52,64 @@ public static class Program
             return 0;
         }
 
-        // 2. Inspect / Synchronize installed games with Steam's shortcuts.vdf
+        // 2. List shortcuts currently present in Steam (including manual/external)
+        if (options.ListSteamShortcuts)
+        {
+            var syncService = new Sync.Steam.SteamSyncService(logger: logger);
+            var inspect = syncService.Inspect(options);
+
+            Console.WriteLine();
+            Console.WriteLine($"Found {inspect.ExistingGames.Count} Non-Steam shortcut(s) in Steam library:");
+            Console.WriteLine(new string('-', 100));
+            Console.WriteLine($"{"Origin / Launcher",-18} | {"Shortcut Title",-35} | {"Target / Executable"}");
+            Console.WriteLine(new string('-', 100));
+            foreach (var g in inspect.ExistingGames)
+            {
+                Console.WriteLine($"{g.Launcher,-18} | {g.Title,-35} | {g.LaunchUri}");
+            }
+            Console.WriteLine(new string('-', 100));
+            Console.WriteLine();
+            return 0;
+        }
+
+        // 3. Remove a Non-Steam shortcut by title
+        if (!string.IsNullOrEmpty(options.RemoveShortcutTitle))
+        {
+            var syncService = new Sync.Steam.SteamSyncService(logger: logger);
+            var inspect = syncService.Inspect(options);
+            var target = inspect.ExistingGames.FirstOrDefault(g =>
+                g.Title.Equals(options.RemoveShortcutTitle, StringComparison.OrdinalIgnoreCase) ||
+                Sync.GameDetector.NormalizeTitle(g.Title).Equals(Sync.GameDetector.NormalizeTitle(options.RemoveShortcutTitle), StringComparison.OrdinalIgnoreCase));
+
+            if (target == null)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine();
+                Console.WriteLine($"Shortcut '{options.RemoveShortcutTitle}' was not found in Steam.");
+                Console.ResetColor();
+                return 1;
+            }
+
+            var removeResult = syncService.RemoveShortcut(options, target);
+            if (removeResult.RemovedShortcutsCount > 0)
+            {
+                Console.ForegroundColor = ConsoleColor.Green;
+                Console.WriteLine();
+                Console.WriteLine($"✔ Successfully removed '{target.Title}' and its artwork from Steam ({removeResult.UpdatedProfilesCount} profile(s) updated).");
+                Console.ResetColor();
+                return 0;
+            }
+            else
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine();
+                Console.WriteLine($"✖ Failed to remove '{target.Title}' from Steam: {removeResult.ErrorMessage ?? "Unknown error"}.");
+                Console.ResetColor();
+                return 1;
+            }
+        }
+
+        // 4. Inspect / Synchronize installed games with Steam's shortcuts.vdf
         if (options.SyncSteam)
         {
             var syncService = new Sync.Steam.SteamSyncService(logger: logger);
@@ -65,7 +122,10 @@ public static class Program
                     result,
                     selectedGames => syncService.SyncSelectedGames(options, selectedGames, deferArtwork: true),
                     () => syncService.SyncArtworkForExistingGames(options),
-                    options.SettingsFilePath);
+                    options.SettingsFilePath,
+                    gameToRemove => syncService.RemoveShortcut(options, gameToRemove),
+                    games => syncService.FetchArtworkOptionsForGames(options, games, maxPerPiece: 4, onlyMissing: false),
+                    selections => syncService.ApplyArtworkSelections(options, selections));
             }
             else
             {

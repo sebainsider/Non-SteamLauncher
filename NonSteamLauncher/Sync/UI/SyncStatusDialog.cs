@@ -11,7 +11,10 @@ public static class SyncStatusDialog
         SteamSyncResult result,
         Func<IReadOnlyList<InstalledGame>, SteamSyncResult>? onSyncSelected = null,
         Func<SteamSyncResult>? onSettingsSaved = null,
-        string? settingsFilePath = null)
+        string? settingsFilePath = null,
+        Func<InstalledGame, SteamSyncResult>? onRemoveGame = null,
+        Func<IReadOnlyList<InstalledGame>, List<GameArtworkOptions>>? onFetchArtworkOptions = null,
+        Func<IReadOnlyList<GameArtworkSelection>, SteamSyncResult>? onApplyArtworkSelections = null)
     {
         if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
@@ -23,7 +26,14 @@ public static class SyncStatusDialog
         {
             if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
             {
-                var win = new SyncStatusWindow(result, onSyncSelected, onSettingsSaved, settingsFilePath);
+                var win = new SyncStatusWindow(
+                    result,
+                    onSyncSelected,
+                    onSettingsSaved,
+                    settingsFilePath,
+                    onRemoveGame,
+                    onFetchArtworkOptions,
+                    onApplyArtworkSelections);
                 win.ShowDialog();
                 return win.Result;
             }
@@ -34,7 +44,14 @@ public static class SyncStatusDialog
                 {
                     try
                     {
-                        var win = new SyncStatusWindow(result, onSyncSelected, onSettingsSaved, settingsFilePath);
+                        var win = new SyncStatusWindow(
+                            result,
+                            onSyncSelected,
+                            onSettingsSaved,
+                            settingsFilePath,
+                            onRemoveGame,
+                            onFetchArtworkOptions,
+                            onApplyArtworkSelections);
                         win.ShowDialog();
                         finalResult = win.Result;
                     }
@@ -818,6 +835,41 @@ public static class SyncStatusDialog
 
         [DllImport("xinput9_1_0.dll", EntryPoint = "XInputGetState")]
         private static extern uint XInputGetState910(uint dwUserIndex, out XINPUT_STATE pState);
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        private struct JOYCAPSW
+        {
+            public ushort wMid;
+            public ushort wPid;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public string szPname;
+            public uint wXmin;
+            public uint wXmax;
+            public uint wYmin;
+            public uint wYmax;
+            public uint wZmin;
+            public uint wZmax;
+            public uint wNumButtons;
+            public uint wPeriodMin;
+            public uint wPeriodMax;
+            public uint wRmin;
+            public uint wRmax;
+            public uint wUmin;
+            public uint wUmax;
+            public uint wVmin;
+            public uint wVmax;
+            public uint wCaps;
+            public uint wMaxAxes;
+            public uint wNumAxes;
+            public uint wMaxButtons;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+            public string szRegKey;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szOEMVxD;
+        }
+
+        [DllImport("winmm.dll", EntryPoint = "joyGetDevCapsW", CharSet = CharSet.Unicode)]
+        private static extern uint joyGetDevCapsW(uint uJoyID, ref JOYCAPSW pjc, uint cbjc);
 
         [DllImport("winmm.dll")]
         private static extern uint joyGetPosEx(uint uJoyID, ref JOYINFOEX pji);
@@ -2941,10 +2993,18 @@ public static class SyncStatusDialog
             // 2. Fallback to WinMM joyGetPosEx (PlayStation DualSense/DualShock, Switch Pro, DirectInput Joysticks)
             if (!_winmmFailed)
             {
-                for (uint j = 0; j < 2; j++)
+                for (uint j = 0; j < 16; j++)
                 {
                     try
                     {
+                        var jc = new JOYCAPSW();
+                        if (joyGetDevCapsW(j, ref jc, (uint)Marshal.SizeOf(jc)) != 0)
+                            continue;
+
+                        // Navigable game controllers must have at least 2 axes (X and Y analog thumbsticks)
+                        if (jc.wNumAxes < 2)
+                            continue;
+
                         var ji = new JOYINFOEX
                         {
                             dwSize = (uint)Marshal.SizeOf<JOYINFOEX>(),
@@ -2953,11 +3013,14 @@ public static class SyncStatusDialog
 
                         if (joyGetPosEx(j, ref ji) == 0)
                         {
+                            // Ignore dummy/dead interfaces returning all zeros
+                            if (ji.dwXpos == 0 && ji.dwYpos == 0 && ji.dwZpos == 0 && ji.dwRpos == 0 && ji.dwPOV == 0 && ji.dwButtons == 0)
+                                continue;
+
                             ushort mappedButtons = 0;
-                            // Standard DirectInput / PlayStation / Generic button mapping:
-                            // Button 1 (0x01) = Square/X, Button 2 (0x02) = Cross/A, Button 3 (0x04) = Circle/B, Button 4 (0x08) = Triangle/Y
-                            // For PlayStation (detected via VID_054C): Cross is index 1 (0x02), Circle is index 2 (0x04), Square is index 0 (0x01), Triangle is index 3 (0x08)
-                            if (_gamepadType == GamepadType.PlayStation)
+                            bool isPs = (_gamepadType == GamepadType.PlayStation) || (jc.wMid == 0x054C);
+
+                            if (isPs)
                             {
                                 if ((ji.dwButtons & 0x0002) != 0) mappedButtons |= XINPUT_GAMEPAD_A;     // Cross
                                 if ((ji.dwButtons & 0x0004) != 0) mappedButtons |= XINPUT_GAMEPAD_B;     // Circle

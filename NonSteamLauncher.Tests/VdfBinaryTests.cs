@@ -84,4 +84,6 @@ public class VdfBinaryTests
         // High bit must be set for Steam non-steam shortcut AppIDs
         Assert.True((appId1 & 0x80000000) != 0);
     }
+
+
 }

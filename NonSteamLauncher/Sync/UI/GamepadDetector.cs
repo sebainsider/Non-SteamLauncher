@@ -193,13 +193,13 @@ public static class GamepadDetector
                 return GamepadType.Xbox;
             }
 
-            // If there is only a composite keyboard/dongle (MI_04) and no XInput controller, default to Keyboard
-            if (hasCompositePlayStationKeyboard)
+            // If there is ONLY a composite keyboard/dongle (MI_04) without a standalone gamepad HID device, default to Keyboard
+            if (hasCompositePlayStationKeyboard && !hasStandalonePlayStation)
                 return GamepadType.Keyboard;
 
             if (hasStandalonePlayStation || hasNintendo)
             {
-                for (uint j = 0; j < 4; j++)
+                for (uint j = 0; j < 16; j++)
                 {
                     try
                     {

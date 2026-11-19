@@ -8,6 +8,8 @@ public class InstalledGame
     public string? ExecutablePath { get; set; }
     public string? IconPath { get; set; }
     public string? InstallDirectory { get; set; }
+    public uint? AppId { get; set; }
+    public bool IsManualShortcut { get; set; }
 
     public override string ToString() => $"[{Launcher}] {Title} -> {LaunchUri}";
 }

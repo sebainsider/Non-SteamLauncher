@@ -66,6 +66,37 @@ public class LocalizedStrings
     public string SettingsLanguageLabel { get; init; } = "Language";
     public string ArtworkProviderTitle { get; init; } = "Artwork Downloads (SteamGridDB)";
     public string ArtworkProviderDesc { get; init; } = "Automatically download boxart covers, banners, logos, and icons for each game.";
+    public string DialogDeleteTitle { get; init; } = "Remove Steam shortcut?";
+    public string DialogDeleteMessageFormat { get; init; } = "Do you want to remove \"{0}\" from Steam? Associated Steam artwork will also be removed. Your game files will not be uninstalled.";
+    public string DialogDeleteConfirm { get; init; } = "Remove";
+    public string DialogDeleteCancel { get; init; } = "Cancel";
+    public string TooltipDeleteShortcut { get; init; } = "Remove from Steam";
+    public string LegendDelete { get; init; } = "Remove";
+    public string LauncherManual { get; init; } = "Manual";
+    public string StatusSyncing { get; init; } = "Syncing and downloading artwork...";
+    public string StatusSyncingGame { get; init; } = "Syncing...";
+    public string StatusFetchingArtworkOptions { get; init; } = "Searching top artwork options...";
+    public string StatusApplyingArtwork { get; init; } = "Downloading selected artwork...";
+    public string ArtworkPickerTitle { get; init; } = "Choose artwork";
+    public string ArtworkPickerSubtitle { get; init; } = "Pick your favorite option for each piece (top 4 results)";
+    public string ArtworkPickerGameProgressFormat { get; init; } = "Game {0} of {1}";
+    public string ArtworkPiecePoster { get; init; } = "Poster";
+    public string ArtworkPieceWide { get; init; } = "Wide banner";
+    public string ArtworkPieceHero { get; init; } = "Hero";
+    public string ArtworkPieceLogo { get; init; } = "Logo";
+    public string ArtworkPieceIcon { get; init; } = "Icon";
+    public string ArtworkPickerSkipPiece { get; init; } = "Skip this piece";
+    public string ArtworkPickerNoOptions { get; init; } = "No artwork options were found for this piece.";
+    public string ArtworkPickerApplyButton { get; init; } = "Apply artwork";
+    public string ArtworkPickerSkipAllButton { get; init; } = "Skip";
+    public string ArtworkPickerPrevGame { get; init; } = "Previous";
+    public string ArtworkPickerNextGame { get; init; } = "Next";
+    public string ArtworkPickerLoading { get; init; } = "Loading preview...";
+    public string ArtworkPickerSelectedBadge { get; init; } = "Selected";
+    public string ArtworkPickerHintLegend { get; init; } = "Arrows: choose • Tab: piece • Enter: apply • Esc: skip";
+    public string SettingsSyncArtworkButton { get; init; } = "Sync & choose artwork";
+    public string SettingsSyncArtworkTitle { get; init; } = "Customize Steam artwork";
+    public string TooltipChooseArtwork { get; init; } = "Choose artwork";
 }
 
 public static class Localization
@@ -153,7 +184,38 @@ public static class Localization
         KeyNameEsc = "Esc",
         SettingsLanguageLabel = "Idioma",
         ArtworkProviderTitle = "Descarga de carátulas e imágenes",
-        ArtworkProviderDesc = "Configura SteamGridDB para descargar portadas verticales, banners, logos e iconos automáticamente."
+        ArtworkProviderDesc = "Configura SteamGridDB para descargar portadas verticales, banners, logos e iconos automáticamente.",
+        DialogDeleteTitle = "¿Eliminar acceso directo de Steam?",
+        DialogDeleteMessageFormat = "¿Deseas eliminar \"{0}\" de Steam? Se eliminarán también las carátulas asociadas de Steam. Los archivos del juego no se desinstalarán.",
+        DialogDeleteConfirm = "Eliminar",
+        DialogDeleteCancel = "Cancelar",
+        TooltipDeleteShortcut = "Eliminar de Steam",
+        LegendDelete = "Eliminar",
+        LauncherManual = "Manual",
+        StatusSyncing = "Sincronizando y descargando carátulas...",
+        StatusSyncingGame = "Sincronizando...",
+        StatusFetchingArtworkOptions = "Buscando las mejores opciones de carátulas...",
+        StatusApplyingArtwork = "Descargando carátulas seleccionadas...",
+        ArtworkPickerTitle = "Elegir carátulas",
+        ArtworkPickerSubtitle = "Elige tu opción favorita para cada pieza (4 mejores opciones)",
+        ArtworkPickerGameProgressFormat = "Juego {0} de {1}",
+        ArtworkPiecePoster = "Portada",
+        ArtworkPieceWide = "Banner ancho",
+        ArtworkPieceHero = "Fondo (Hero)",
+        ArtworkPieceLogo = "Logo",
+        ArtworkPieceIcon = "Icono",
+        ArtworkPickerSkipPiece = "Omitir esta pieza",
+        ArtworkPickerNoOptions = "No se encontraron opciones de artwork para esta pieza.",
+        ArtworkPickerApplyButton = "Aplicar carátulas",
+        ArtworkPickerSkipAllButton = "Omitir",
+        ArtworkPickerPrevGame = "Anterior",
+        ArtworkPickerNextGame = "Siguiente",
+        ArtworkPickerLoading = "Cargando vista previa...",
+        ArtworkPickerSelectedBadge = "Seleccionada",
+        ArtworkPickerHintLegend = "Flechas: elegir • Tab: pieza • Enter: aplicar • Esc: omitir",
+        SettingsSyncArtworkButton = "Sincronizar y elegir carátulas",
+        SettingsSyncArtworkTitle = "Personalizar carátulas en Steam",
+        TooltipChooseArtwork = "Elegir carátulas"
     };
 
     private static readonly LocalizedStrings English = new()
@@ -219,7 +281,31 @@ public static class Localization
         KeyNameEsc = "Esc",
         SettingsLanguageLabel = "Language",
         ArtworkProviderTitle = "Artwork & Images Downloads",
-        ArtworkProviderDesc = "Configure SteamGridDB to automatically download vertical covers, banners, logos, and icons."
+        ArtworkProviderDesc = "Configure SteamGridDB to automatically download vertical covers, banners, logos, and icons.",
+        StatusSyncing = "Syncing and downloading artwork...",
+        StatusSyncingGame = "Syncing...",
+        StatusFetchingArtworkOptions = "Searching top artwork options...",
+        StatusApplyingArtwork = "Downloading selected artwork...",
+        ArtworkPickerTitle = "Choose artwork",
+        ArtworkPickerSubtitle = "Pick your favorite option for each piece (top 4 results)",
+        ArtworkPickerGameProgressFormat = "Game {0} of {1}",
+        ArtworkPiecePoster = "Poster",
+        ArtworkPieceWide = "Wide banner",
+        ArtworkPieceHero = "Hero",
+        ArtworkPieceLogo = "Logo",
+        ArtworkPieceIcon = "Icon",
+        ArtworkPickerSkipPiece = "Skip this piece",
+        ArtworkPickerNoOptions = "No artwork options were found for this piece.",
+        ArtworkPickerApplyButton = "Apply artwork",
+        ArtworkPickerSkipAllButton = "Skip",
+        ArtworkPickerPrevGame = "Previous",
+        ArtworkPickerNextGame = "Next",
+        ArtworkPickerLoading = "Loading preview...",
+        ArtworkPickerSelectedBadge = "Selected",
+        ArtworkPickerHintLegend = "Arrows: choose • Tab: piece • Enter: apply • Esc: skip",
+        SettingsSyncArtworkButton = "Sync & choose artwork",
+        SettingsSyncArtworkTitle = "Customize Steam artwork",
+        TooltipChooseArtwork = "Choose artwork"
     };
 
     private static readonly LocalizedStrings Portuguese = new()
@@ -251,7 +337,9 @@ public static class Localization
         SettingsPasteButton = "Colar",
         SettingsClearButton = "Limpar",
         SettingsGetKeyButton = "Obter API Key",
-        SettingsSaveBackButton = "Salvar e voltar"
+        SettingsSaveBackButton = "Salvar e voltar",
+        StatusSyncing = "Sincronizando e baixando capas...",
+        StatusSyncingGame = "Sincronizando..."
     };
 
     private static readonly LocalizedStrings French = new()
@@ -283,7 +371,9 @@ public static class Localization
         SettingsPasteButton = "Coller",
         SettingsClearButton = "Effacer",
         SettingsGetKeyButton = "Obtenir une clé API",
-        SettingsSaveBackButton = "Enregistrer"
+        SettingsSaveBackButton = "Enregistrer",
+        StatusSyncing = "Synchronisation et téléchargement des jaquettes...",
+        StatusSyncingGame = "Synchronisation..."
     };
 
     private static readonly LocalizedStrings German = new()
@@ -315,7 +405,9 @@ public static class Localization
         SettingsPasteButton = "Einfügen",
         SettingsClearButton = "Löschen",
         SettingsGetKeyButton = "API-Schlüssel abrufen",
-        SettingsSaveBackButton = "Speichern"
+        SettingsSaveBackButton = "Speichern",
+        StatusSyncing = "Synchronisieren und Herunterladen von Covern...",
+        StatusSyncingGame = "Synchronisieren..."
     };
 
     private static readonly LocalizedStrings Italian = new()
@@ -347,7 +439,9 @@ public static class Localization
         SettingsPasteButton = "Incolla",
         SettingsClearButton = "Cancella",
         SettingsGetKeyButton = "Ottieni chiave API",
-        SettingsSaveBackButton = "Salva e torna"
+        SettingsSaveBackButton = "Salva e torna",
+        StatusSyncing = "Sincronizzazione e download delle copertine...",
+        StatusSyncingGame = "Sincronizzazione..."
     };
 
     private static readonly LocalizedStrings Russian = new()
@@ -379,7 +473,9 @@ public static class Localization
         SettingsPasteButton = "Вставить",
         SettingsClearButton = "Очистить",
         SettingsGetKeyButton = "Получить ключ API",
-        SettingsSaveBackButton = "Сохранить"
+        SettingsSaveBackButton = "Сохранить",
+        StatusSyncing = "Синхронизация и загрузка обложек...",
+        StatusSyncingGame = "Синхронизация..."
     };
 
     private static readonly LocalizedStrings Japanese = new()
@@ -411,7 +507,9 @@ public static class Localization
         SettingsPasteButton = "貼り付け",
         SettingsClearButton = "クリア",
         SettingsGetKeyButton = "APIキーを取得",
-        SettingsSaveBackButton = "保存して戻る"
+        SettingsSaveBackButton = "保存して戻る",
+        StatusSyncing = "同期中およびアートワークをダウンロード中...",
+        StatusSyncingGame = "同期中..."
     };
 
     private static readonly LocalizedStrings Chinese = new()
@@ -443,6 +541,8 @@ public static class Localization
         SettingsPasteButton = "粘贴",
         SettingsClearButton = "清除",
         SettingsGetKeyButton = "获取 API 密钥",
-        SettingsSaveBackButton = "保存并返回"
+        SettingsSaveBackButton = "保存并返回",
+        StatusSyncing = "正在同步并下载封面...",
+        StatusSyncingGame = "正在同步..."
     };
 }

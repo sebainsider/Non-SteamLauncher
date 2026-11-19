@@ -7,12 +7,14 @@ public class SteamSyncResult
     public int DetectedGamesCount { get; set; }
     public int AddedShortcutsCount { get; set; }
     public int ExistingShortcutsCount { get; set; }
+    public int RemovedShortcutsCount { get; set; }
     public int UpdatedProfilesCount { get; set; }
     public int ArtworkImagesDownloadedCount { get; set; }
     public int ArtworkGamesUpdatedCount { get; set; }
     public List<InstalledGame> AddedGames { get; set; } = new();
     public List<InstalledGame> ExistingGames { get; set; } = new();
     public List<InstalledGame> PendingGames { get; set; } = new();
+    public List<InstalledGame> RemovedGames { get; set; } = new();
     public bool Success { get; set; }
     public string? ErrorMessage { get; set; }
 }
@@ -133,9 +135,19 @@ public class SteamSyncService
 
         result.DetectedGamesCount = games.Count;
 
+        var matchedShortcuts = new HashSet<SteamShortcut>();
         foreach (var game in games)
         {
             var matchingShortcut = FindMatchingShortcut(allShortcuts, game);
+            if (matchingShortcut != null)
+            {
+                matchedShortcuts.Add(matchingShortcut);
+                if (matchingShortcut.AppId != 0 && (game.AppId == null || game.AppId == 0))
+                {
+                    game.AppId = matchingShortcut.AppId;
+                }
+            }
+
             if (matchingShortcut != null && matchingShortcut.Exe.Contains("NonSteamLauncher", StringComparison.OrdinalIgnoreCase))
             {
                 if (!string.IsNullOrEmpty(matchingShortcut.Icon) && File.Exists(matchingShortcut.Icon))
@@ -149,6 +161,70 @@ public class SteamSyncService
             {
                 result.PendingGames.Add(game);
             }
+        }
+
+        // Also discover any manual / external shortcuts or games already in shortcuts.vdf
+        var seenTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var g in result.ExistingGames)
+        {
+            if (!string.IsNullOrWhiteSpace(g.Title))
+            {
+                seenTitles.Add(g.Title);
+                string norm = GameDetector.NormalizeTitle(g.Title);
+                if (!string.IsNullOrEmpty(norm)) seenTitles.Add(norm);
+            }
+        }
+        foreach (var g in result.PendingGames)
+        {
+            if (!string.IsNullOrWhiteSpace(g.Title))
+            {
+                seenTitles.Add(g.Title);
+                string norm = GameDetector.NormalizeTitle(g.Title);
+                if (!string.IsNullOrEmpty(norm)) seenTitles.Add(norm);
+            }
+        }
+
+        foreach (var s in allShortcuts)
+        {
+            if (matchedShortcuts.Contains(s))
+                continue;
+
+            string cleanTitle = s.AppName?.Trim() ?? string.Empty;
+            if (string.IsNullOrEmpty(cleanTitle))
+                continue;
+
+            string normTitle = GameDetector.NormalizeTitle(cleanTitle);
+            if (seenTitles.Contains(cleanTitle) || (!string.IsNullOrEmpty(normTitle) && seenTitles.Contains(normTitle)))
+                continue;
+
+            seenTitles.Add(cleanTitle);
+            if (!string.IsNullOrEmpty(normTitle))
+                seenTitles.Add(normTitle);
+
+            string cleanExe = s.Exe.Trim('"', '\'');
+            string launcherTag = (s.Tags != null && s.Tags.Count > 0 && !string.IsNullOrWhiteSpace(s.Tags[0]))
+                ? s.Tags[0]
+                : "Manual";
+
+            uint appId = s.AppId;
+            if (appId == 0 && !string.IsNullOrEmpty(s.Exe) && !string.IsNullOrEmpty(s.AppName))
+            {
+                appId = SteamCrc32.GenerateAppId(s.Exe, s.AppName);
+            }
+
+            var manualGame = new InstalledGame
+            {
+                Title = cleanTitle,
+                Launcher = launcherTag,
+                LaunchUri = cleanExe,
+                ExecutablePath = cleanExe,
+                IconPath = !string.IsNullOrEmpty(s.Icon) ? s.Icon : (File.Exists(cleanExe) ? cleanExe : null),
+                AppId = appId != 0 ? appId : null,
+                IsManualShortcut = true
+            };
+
+            result.ExistingGames.Add(manualGame);
+            result.ExistingShortcutsCount++;
         }
 
         result.Success = true;
@@ -234,6 +310,157 @@ public class SteamSyncService
     }
 
     /// <summary>
+    /// Fetches up to <paramref name="maxPerPiece"/> top-ranked artwork options for each piece of each specified game.
+    /// </summary>
+    public List<GameArtworkOptions> FetchArtworkOptionsForGames(
+        Options options,
+        IReadOnlyList<InstalledGame> games,
+        int maxPerPiece = 4,
+        bool onlyMissing = false)
+    {
+        var results = new List<GameArtworkOptions>();
+        var settings = ResolveSettings(options);
+        if (!settings.DownloadArtwork || options.SkipArtwork || games.Count == 0)
+            return results;
+
+        string? steamDir = _steamLocator.FindSteamInstallDirectory(options.SteamPath);
+        string? firstGridDir = null;
+        var shortcuts = new List<SteamShortcut>();
+
+        if (!string.IsNullOrEmpty(steamDir))
+        {
+            var profiles = _steamLocator.FindUserProfiles(steamDir);
+            if (profiles.Count > 0)
+            {
+                string configDir = Path.Combine(profiles[0], "config");
+                firstGridDir = Path.Combine(configDir, "grid");
+                string shortcutsPath = Path.Combine(configDir, "shortcuts.vdf");
+                if (File.Exists(shortcutsPath))
+                {
+                    try
+                    {
+                        shortcuts = VdfBinaryReader.ReadShortcuts(File.ReadAllBytes(shortcutsPath));
+                    }
+                    catch { }
+                }
+            }
+        }
+
+        foreach (var game in games)
+        {
+            uint appId = game.AppId ?? 0;
+            if (appId == 0 && shortcuts.Count > 0)
+            {
+                var match = FindMatchingShortcut(shortcuts, game);
+                if (match != null)
+                {
+                    appId = match.AppId != 0
+                        ? match.AppId
+                        : SteamCrc32.GenerateAppId(match.Exe, match.AppName);
+                    if (appId != 0)
+                        game.AppId = appId;
+                }
+            }
+
+            var gameOptions = _artworkService.FetchArtworkOptionsForGame(
+                game,
+                appId,
+                settings.SteamGridDbApiKey,
+                firstGridDir,
+                maxPerPiece,
+                onlyMissing);
+
+            results.Add(gameOptions);
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Downloads and applies user-selected artwork pieces across all Steam user profiles.
+    /// </summary>
+    public SteamSyncResult ApplyArtworkSelections(
+        Options options,
+        IReadOnlyList<GameArtworkSelection> selections)
+    {
+        if (selections.Count == 0)
+            return Inspect(options);
+
+        string? steamDir = _steamLocator.FindSteamInstallDirectory(options.SteamPath);
+        if (string.IsNullOrEmpty(steamDir))
+            return Inspect(options);
+
+        var profiles = _steamLocator.FindUserProfiles(steamDir);
+        int totalImages = 0;
+        int totalGames = 0;
+
+        foreach (var profileDir in profiles)
+        {
+            string configDir = Path.Combine(profileDir, "config");
+            string gridDir = Path.Combine(configDir, "grid");
+            string shortcutsPath = Path.Combine(configDir, "shortcuts.vdf");
+            if (!File.Exists(shortcutsPath))
+                continue;
+
+            List<SteamShortcut> shortcuts;
+            try
+            {
+                shortcuts = VdfBinaryReader.ReadShortcuts(File.ReadAllBytes(shortcutsPath));
+            }
+            catch
+            {
+                continue;
+            }
+
+            bool iconsModified = false;
+
+            foreach (var selection in selections)
+            {
+                var matchingShortcut = FindMatchingShortcut(shortcuts, selection.Game);
+                if (matchingShortcut == null && selection.AppId != 0)
+                {
+                    matchingShortcut = shortcuts.FirstOrDefault(s => s.AppId == selection.AppId);
+                }
+                if (matchingShortcut == null)
+                    continue;
+
+                if (matchingShortcut.AppId == 0)
+                {
+                    matchingShortcut.AppId = SteamCrc32.GenerateAppId(matchingShortcut.Exe, matchingShortcut.AppName);
+                }
+
+                var artRes = _artworkService.ApplySelectedArtworkForShortcut(
+                    gridDir,
+                    matchingShortcut,
+                    selection.Game,
+                    selection,
+                    options.DryRun);
+
+                totalImages += artRes.ImagesDownloadedCount;
+                totalGames += artRes.GamesUpdatedCount;
+                if (artRes.IconsModifiedInShortcuts)
+                {
+                    iconsModified = true;
+                }
+            }
+
+            if (iconsModified && !options.DryRun)
+            {
+                try
+                {
+                    File.WriteAllBytes(shortcutsPath, VdfBinaryWriter.WriteShortcuts(shortcuts));
+                }
+                catch { }
+            }
+        }
+
+        var updated = Inspect(options);
+        updated.ArtworkImagesDownloadedCount = totalImages;
+        updated.ArtworkGamesUpdatedCount = totalGames;
+        return updated;
+    }
+
+    /// <summary>
     /// Synchronizes only the user-selected games into Steam's shortcuts.vdf.
     /// </summary>
     public SteamSyncResult SyncSelectedGames(Options options, IReadOnlyList<InstalledGame> selectedGames, bool deferArtwork = false)
@@ -302,12 +529,28 @@ public class SteamSyncService
                     if (existingShortcut.Exe.Contains("NonSteamLauncher", StringComparison.OrdinalIgnoreCase))
                     {
                         targetShortcut = existingShortcut;
+                        string expectedOptions = BuildLaunchOptions(game.LaunchUri);
+                        if (!string.Equals(existingShortcut.LaunchOptions, expectedOptions, StringComparison.OrdinalIgnoreCase))
+                        {
+                            existingShortcut.LaunchOptions = expectedOptions;
+                            profileAdded++;
+                            _logger.LogInfo($"  ⚡ Updated LaunchOptions for [{game.Launcher}] {game.Title} -> {game.LaunchUri}");
+                        }
+                        if ((string.IsNullOrEmpty(existingShortcut.Icon) || existingShortcut.Icon.Contains("prelauncher", StringComparison.OrdinalIgnoreCase)) && !string.IsNullOrEmpty(game.IconPath))
+                        {
+                            existingShortcut.Icon = game.IconPath;
+                            iconsModified = true;
+                        }
+                        if (existingShortcut.AppId == 0)
+                        {
+                            existingShortcut.AppId = SteamCrc32.GenerateAppId(exePath, existingShortcut.AppName);
+                        }
                     }
                     else
                     {
                         existingShortcut.Exe = exePath;
                         existingShortcut.StartDir = startDir;
-                        existingShortcut.LaunchOptions = $"--launch \"{game.LaunchUri}\" --close-launcher --disable-overlay";
+                        existingShortcut.LaunchOptions = BuildLaunchOptions(game.LaunchUri);
                         if (string.IsNullOrEmpty(existingShortcut.Icon) && !string.IsNullOrEmpty(game.IconPath))
                         {
                             existingShortcut.Icon = game.IconPath;
@@ -337,7 +580,7 @@ public class SteamSyncService
                         AppName = game.Title,
                         Exe = exePath,
                         StartDir = startDir,
-                        LaunchOptions = $"--launch \"{game.LaunchUri}\" --close-launcher --disable-overlay",
+                        LaunchOptions = BuildLaunchOptions(game.LaunchUri),
                         Icon = game.IconPath ?? "",
                         Tags = new List<string> { game.Launcher },
                         AllowDesktopConfig = 1,
@@ -516,6 +759,20 @@ public class SteamSyncService
                             existingShortcut.AppId = SteamCrc32.GenerateAppId(existingShortcut.Exe, existingShortcut.AppName);
                         }
 
+                        string expectedOptions = BuildLaunchOptions(game.LaunchUri);
+                        if (!string.Equals(existingShortcut.LaunchOptions, expectedOptions, StringComparison.OrdinalIgnoreCase))
+                        {
+                            existingShortcut.LaunchOptions = expectedOptions;
+                            iconsModified = true;
+                            _logger.LogInfo($"  ⚡ Updated LaunchOptions for [{game.Launcher}] {game.Title} -> {game.LaunchUri}");
+                        }
+
+                        if ((string.IsNullOrEmpty(existingShortcut.Icon) || existingShortcut.Icon.Contains("prelauncher", StringComparison.OrdinalIgnoreCase)) && !string.IsNullOrEmpty(game.IconPath))
+                        {
+                            existingShortcut.Icon = game.IconPath;
+                            iconsModified = true;
+                        }
+
                         if (downloadArtwork)
                         {
                             var artRes = _artworkService.EnsureArtworkForShortcut(
@@ -550,7 +807,7 @@ public class SteamSyncService
                     _logger.LogInfo($"  ⚡ Upgrading existing Steam shortcut '{existingShortcut.AppName}' from direct exe to NonSteamLauncher wrapper...");
                     existingShortcut.Exe = exePath;
                     existingShortcut.StartDir = startDir;
-                    existingShortcut.LaunchOptions = $"--launch \"{game.LaunchUri}\" --close-launcher --disable-overlay";
+                    existingShortcut.LaunchOptions = BuildLaunchOptions(game.LaunchUri);
                     if (string.IsNullOrEmpty(existingShortcut.Icon) && !string.IsNullOrEmpty(game.IconPath))
                     {
                         existingShortcut.Icon = game.IconPath;
@@ -586,7 +843,7 @@ public class SteamSyncService
                 }
 
                 // Construct new shortcut
-                string launchOptions = $"--launch \"{game.LaunchUri}\" --close-launcher --disable-overlay";
+                string launchOptions = BuildLaunchOptions(game.LaunchUri);
 
                 var newShortcut = new SteamShortcut
                 {
@@ -636,7 +893,7 @@ public class SteamSyncService
                     _logger.LogInfo($"  ⚡ Detected direct-exe shortcut '{s.AppName}' [{detectedLauncher}]. Upgrading to NonSteamLauncher...");
                     s.Exe = exePath;
                     s.StartDir = startDir;
-                    s.LaunchOptions = $"--launch \"{cleanExe}\" --close-launcher --disable-overlay";
+                    s.LaunchOptions = BuildLaunchOptions(cleanExe);
                     if (string.IsNullOrEmpty(s.Icon) && File.Exists(cleanExe))
                     {
                         s.Icon = cleanExe;
@@ -722,6 +979,218 @@ public class SteamSyncService
         result.Success = true;
         _logger.LogInfo("=== Steam Library Sync Completed Successfully ===");
         return result;
+    }
+
+    /// <summary>
+    /// Removes a specific Non-Steam game shortcut from Steam's shortcuts.vdf and cleans up its grid artwork.
+    /// </summary>
+    public SteamSyncResult RemoveShortcut(Options options, InstalledGame gameToRemove)
+    {
+        return RemoveShortcuts(options, new[] { gameToRemove });
+    }
+
+    /// <summary>
+    /// Removes a list of Non-Steam game shortcuts from Steam's shortcuts.vdf and cleans up their grid artwork.
+    /// </summary>
+    public SteamSyncResult RemoveShortcuts(Options options, IReadOnlyList<InstalledGame> gamesToRemove)
+    {
+        ResolveSettings(options);
+        var result = new SteamSyncResult();
+
+        if (gamesToRemove == null || gamesToRemove.Count == 0)
+        {
+            return Inspect(options);
+        }
+
+        _logger.LogInfo($"=== Removing {gamesToRemove.Count} Non-Steam Shortcut(s) from Steam ===");
+        foreach (var g in gamesToRemove)
+        {
+            _logger.LogInfo($"  - [{g.Launcher}] {g.Title} (AppID: {g.AppId})");
+        }
+
+        string? steamDir = _steamLocator.FindSteamInstallDirectory(options.SteamPath);
+        if (string.IsNullOrEmpty(steamDir))
+        {
+            string err = "Could not locate Steam installation directory. Please specify it using --steam-path <path>.";
+            _logger.LogError(err);
+            result.ErrorMessage = err;
+            result.Success = false;
+            return result;
+        }
+
+        if (_steamLocator.IsSteamRunning())
+        {
+            _logger.LogWarning("----------------------------------------------------------------------");
+            _logger.LogWarning("⚠️  WARNING: Steam is currently running!");
+            _logger.LogWarning("   Please exit Steam so your removed shortcuts are not overwritten by Steam upon exit.");
+            _logger.LogWarning("----------------------------------------------------------------------");
+        }
+
+        var profiles = _steamLocator.FindUserProfiles(steamDir);
+        if (profiles.Count == 0)
+        {
+            string err = $"No Steam user profiles found in '{Path.Combine(steamDir, "userdata")}'.";
+            _logger.LogError(err);
+            result.ErrorMessage = err;
+            result.Success = false;
+            return result;
+        }
+
+        int totalRemoved = 0;
+        int updatedProfiles = 0;
+        var removedGames = new List<InstalledGame>();
+
+        foreach (var profileDir in profiles)
+        {
+            string profileId = Path.GetFileName(profileDir);
+            string configDir = Path.Combine(profileDir, "config");
+            string gridDir = Path.Combine(configDir, "grid");
+            string shortcutsPath = Path.Combine(configDir, "shortcuts.vdf");
+            string backupPath = Path.Combine(configDir, "shortcuts.vdf.bak");
+
+            if (!File.Exists(shortcutsPath))
+                continue;
+
+            List<SteamShortcut> shortcuts;
+            try
+            {
+                byte[] data = File.ReadAllBytes(shortcutsPath);
+                shortcuts = VdfBinaryReader.ReadShortcuts(data);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Could not read 'shortcuts.vdf' in profile {profileId}: {ex.Message}");
+                continue;
+            }
+
+            int profileRemoved = 0;
+            var appIdsToRemoveArtwork = new List<uint>();
+
+            for (int i = shortcuts.Count - 1; i >= 0; i--)
+            {
+                var s = shortcuts[i];
+                var match = gamesToRemove.FirstOrDefault(g => IsShortcutMatch(s, g));
+                if (match != null)
+                {
+                    uint id = s.AppId;
+                    if (id == 0 && !string.IsNullOrEmpty(s.Exe) && !string.IsNullOrEmpty(s.AppName))
+                    {
+                        id = SteamCrc32.GenerateAppId(s.Exe, s.AppName);
+                    }
+                    if (id != 0)
+                    {
+                        appIdsToRemoveArtwork.Add(id);
+                    }
+
+                    shortcuts.RemoveAt(i);
+                    profileRemoved++;
+                    if (!removedGames.Any(rg => rg.Title.Equals(match.Title, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        removedGames.Add(match);
+                    }
+                    _logger.LogInfo($"  ✔ Removed shortcut '{s.AppName}' from profile {profileId}");
+                }
+            }
+
+            if (profileRemoved > 0)
+            {
+                totalRemoved += profileRemoved;
+                if (!options.DryRun)
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(configDir);
+                        if (File.Exists(shortcutsPath))
+                        {
+                            File.Copy(shortcutsPath, backupPath, overwrite: true);
+                        }
+
+                        byte[] outputData = VdfBinaryWriter.WriteShortcuts(shortcuts);
+                        File.WriteAllBytes(shortcutsPath, outputData);
+                        _logger.LogInfo($"  Saved {shortcuts.Count} remaining shortcut(s) to '{shortcutsPath}'.");
+                        updatedProfiles++;
+
+                        // Clean up grid artwork
+                        if (Directory.Exists(gridDir))
+                        {
+                            foreach (var appId in appIdsToRemoveArtwork)
+                            {
+                                RemoveArtworkForAppId(gridDir, appId);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError($"  Error writing 'shortcuts.vdf' for profile {profileId}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    _logger.LogInfo($"  [DRY RUN] Would remove {profileRemoved} shortcut(s) from '{shortcutsPath}'.");
+                }
+            }
+        }
+
+        var inspectResult = Inspect(options);
+        inspectResult.RemovedShortcutsCount = totalRemoved;
+        inspectResult.RemovedGames = removedGames;
+        inspectResult.UpdatedProfilesCount = updatedProfiles;
+        return inspectResult;
+    }
+
+    private static bool IsShortcutMatch(SteamShortcut s, InstalledGame g)
+    {
+        if (g.AppId.HasValue && g.AppId.Value != 0 && s.AppId != 0 && s.AppId == g.AppId.Value)
+            return true;
+
+        if (s.AppName.Equals(g.Title, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string normS = GameDetector.NormalizeTitle(s.AppName);
+        string normG = GameDetector.NormalizeTitle(g.Title);
+        if (!string.IsNullOrEmpty(normS) && normS.Equals(normG, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!string.IsNullOrEmpty(g.LaunchUri) && s.LaunchOptions.Contains(g.LaunchUri, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (!string.IsNullOrEmpty(g.ExecutablePath) && s.Exe.Trim('"', '\'').Equals(g.ExecutablePath, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return false;
+    }
+
+    private void RemoveArtworkForAppId(string gridDir, uint appId)
+    {
+        if (appId == 0) return;
+        try
+        {
+            ulong id64 = ((ulong)appId << 32) | 0x02000000;
+            string[] prefixes = { appId.ToString(), id64.ToString() };
+
+            foreach (var prefix in prefixes)
+            {
+                var files = Directory.GetFiles(gridDir, $"{prefix}*");
+                foreach (var f in files)
+                {
+                    string name = Path.GetFileNameWithoutExtension(f);
+                    if (name.Equals(prefix, StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals($"{prefix}p", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals($"{prefix}_hero", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals($"{prefix}_logo", StringComparison.OrdinalIgnoreCase) ||
+                        name.Equals($"{prefix}_icon", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try
+                        {
+                            File.Delete(f);
+                            _logger.LogDebug($"  Deleted artwork file: {Path.GetFileName(f)}");
+                        }
+                        catch { }
+                    }
+                }
+            }
+        }
+        catch { }
     }
 
     private static SteamShortcut? FindMatchingShortcut(IEnumerable<SteamShortcut> shortcuts, InstalledGame game)
@@ -826,5 +1295,16 @@ public class SteamSyncService
         catch { }
 
         return false;
+    }
+
+    public static string BuildLaunchOptions(string launchUri)
+    {
+        bool usesStoreLauncher = DefaultProcessProvider.GetLauncherProcessNames(launchUri).Length > 0;
+        if (usesStoreLauncher)
+        {
+            return $"--launch \"{launchUri}\" --close-launcher --disable-overlay";
+        }
+
+        return $"--launch \"{launchUri}\"";
     }
 }
