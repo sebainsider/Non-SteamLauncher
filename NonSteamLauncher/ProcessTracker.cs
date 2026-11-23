@@ -121,7 +121,16 @@ public class DefaultProcessProvider : IProcessProvider
             // If main launcher is NOT running, but background helper/service is running, clean them up
             if (!isMainRunning)
             {
-                var helpers = new[] { "EpicWebHelper", "EpicOnlineServicesHost", "EOSOverlayRenderer" };
+                var helpers = new[]
+                {
+                    "EpicWebHelper",
+                    "EpicOnlineServicesHost",
+                    "EOSOverlayRenderer",
+                    "EOSOverlayRenderer-Win64-Shipping",
+                    "EOSOverlayRenderer-Win32-Shipping",
+                    "EpicGamesLauncherUpdate",
+                    "EpicGamesLauncherMigrate"
+                };
                 foreach (var h in helpers)
                 {
                     var procs = Process.GetProcessesByName(h);
@@ -287,6 +296,10 @@ public class DefaultProcessProvider : IProcessProvider
             return new[]
             {
                 "EpicGamesLauncher",
+                "EpicGamesLauncherMigrate",
+                "EpicGamesLauncherSetup",
+                "EpicGamesLauncherUpdate",
+                "UnrealVersionSelector",
                 "EpicWebHelper",
                 "EpicOnlineServicesHost",
                 "EpicOnlineServices",
@@ -434,6 +447,20 @@ public class ProcessTracker
         return name;
     }
 
+    public static bool IsLikelyBootstrapper(string? processName)
+    {
+        if (string.IsNullOrWhiteSpace(processName))
+            return false;
+
+        return processName.Contains("launcher", StringComparison.OrdinalIgnoreCase) ||
+               processName.Contains("bootstrap", StringComparison.OrdinalIgnoreCase) ||
+               processName.Contains("prelauncher", StringComparison.OrdinalIgnoreCase) ||
+               processName.Contains("updater", StringComparison.OrdinalIgnoreCase) ||
+               processName.Contains("patcher", StringComparison.OrdinalIgnoreCase) ||
+               processName.Contains("splash", StringComparison.OrdinalIgnoreCase) ||
+               processName.Contains("setup", StringComparison.OrdinalIgnoreCase);
+    }
+
     public async Task<bool> TrackGameSessionAsync(ProcessSnapshot initialSnapshot, Options options, CancellationToken cancellationToken)
     {
         var startTime = DateTime.UtcNow;
@@ -442,6 +469,15 @@ public class ProcessTracker
         string? effectiveProcessName = !string.IsNullOrEmpty(options.ProcessName)
             ? options.ProcessName
             : InferTargetProcessName(options.LaunchCommand);
+
+        if (string.IsNullOrEmpty(effectiveProcessName))
+        {
+            string? resolvedExe = Sync.EpicGamesScanner.ResolveLaunchExecutableForUri(options.LaunchCommand);
+            if (!string.IsNullOrEmpty(resolvedExe))
+            {
+                effectiveProcessName = InferTargetProcessName(resolvedExe);
+            }
+        }
 
         if (string.IsNullOrEmpty(options.ProcessName) && !string.IsNullOrEmpty(effectiveProcessName))
         {
@@ -471,6 +507,39 @@ public class ProcessTracker
                 gameCandidates = gameCandidates
                     .Where(p => p.ProcessName.Equals(effectiveProcessName, StringComparison.OrdinalIgnoreCase))
                     .ToList();
+            }
+            else if (hasGameStarted && !string.IsNullOrEmpty(primaryProcessName))
+            {
+                if (!IsLikelyBootstrapper(primaryProcessName))
+                {
+                    // Lock onto the detected game process name so unrelated background apps
+                    // (e.g., compilers, IDEs, telemetry, taskkill) started during the session
+                    // are never mistakenly tracked as game processes.
+                    gameCandidates = gameCandidates
+                        .Where(p => p.ProcessName.Equals(primaryProcessName, StringComparison.OrdinalIgnoreCase))
+                        .ToList();
+                }
+                else
+                {
+                    // Primary process is a bootstrapper (e.g., *Launcher.exe). If a non-bootstrapper
+                    // game process appears, promote it to primary and lock onto it.
+                    var promotedGame = gameCandidates.FirstOrDefault(p => !IsLikelyBootstrapper(p.ProcessName));
+                    if (promotedGame != null)
+                    {
+                        _logger.LogInfo($"Promoted target game process from bootstrapper '{primaryProcessName}' to '{promotedGame.ProcessName}' (PID: {promotedGame.Id})");
+                        primaryProcessName = promotedGame.ProcessName;
+                        trackedGamePids.Clear();
+                        gameCandidates = gameCandidates
+                            .Where(p => p.ProcessName.Equals(primaryProcessName, StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+                    }
+                    else
+                    {
+                        gameCandidates = gameCandidates
+                            .Where(p => p.ProcessName.Equals(primaryProcessName, StringComparison.OrdinalIgnoreCase))
+                            .ToList();
+                    }
+                }
             }
 
             foreach (var p in gameCandidates)

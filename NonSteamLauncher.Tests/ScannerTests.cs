@@ -78,6 +78,51 @@ public class ScannerTests
         Assert.Null(game);
     }
 
+    [Fact]
+    public void EpicGamesScanner_ParsePreviewInstallationsLines_ValidGame()
+    {
+        var lines = new[]
+        {
+            """{"version":1,"writtenAt":"2026-11-22T21:40:08Z","entries":1}""",
+            """{"installationId":"880E1B3D488D5C5A28C940896D8D9100","complete":true,"dir":"C:\\Games\\AlanWake2","platform":"Windows","namespace":"c4763f236d08423eb47b4c3008779c84","itemId":"93f2a8c3547846eda966cb3c152a026e","artifactId":"dc9d2e595d0e4650b35d659f90d41059","version":"1.2.11","tags":[""],"sidecar":{"revision":0},"launchCommand":"","launchExecutable":"AlanWake2.exe","writtenAt":"2026-11-22T21:39:30Z"}"""
+        };
+
+        var games = EpicGamesScanner.ParsePreviewInstallationsLines(lines);
+
+        Assert.Single(games);
+        var game = games[0];
+        Assert.Equal("Epic Games", game.Launcher);
+        Assert.Equal("com.epicgames.launcher://apps/c4763f236d08423eb47b4c3008779c84%3A93f2a8c3547846eda966cb3c152a026e%3Adc9d2e595d0e4650b35d659f90d41059?action=launch&silent=true", game.LaunchUri);
+        Assert.Equal(@"C:\Games\AlanWake2\AlanWake2.exe", game.ExecutablePath);
+        Assert.Equal(@"C:\Games\AlanWake2", game.InstallDirectory);
+    }
+
+    [Fact]
+    public void EpicGamesScanner_ResolveLaunchExecutableForUri_FromPreviewInstallations()
+    {
+        string tempFile = Path.Combine(Path.GetTempPath(), $"epic_preview_{Guid.NewGuid():N}.jsonl");
+        try
+        {
+            File.WriteAllLines(tempFile, new[]
+            {
+                """{"version":1,"writtenAt":"2026-11-22T21:40:08Z","entries":1}""",
+                """{"installationId":"880E1B3D","complete":true,"dir":"C:\\Games\\AlanWake2","namespace":"c4763f236d08423eb47b4c3008779c84","itemId":"93f2a8c3547846eda966cb3c152a026e","artifactId":"dc9d2e595d0e4650b35d659f90d41059","launchExecutable":"AlanWake2.exe"}"""
+            });
+
+            string uri = "com.epicgames.launcher://apps/c4763f236d08423eb47b4c3008779c84%3A93f2a8c3547846eda966cb3c152a026e%3Adc9d2e595d0e4650b35d659f90d41059?action=launch&silent=true";
+            string? resolved = EpicGamesScanner.ResolveLaunchExecutableForUri(
+                uri,
+                customManifestsPath: Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N")),
+                customPreviewInstallationsPath: tempFile);
+
+            Assert.Equal(@"C:\Games\AlanWake2\AlanWake2.exe", resolved);
+        }
+        finally
+        {
+            if (File.Exists(tempFile)) File.Delete(tempFile);
+        }
+    }
+
     [Theory]
     [InlineData("com.epicgames.launcher://apps/Item?action=launch", "Epic Games")]
     [InlineData("uplay://launch/5105/0", "Ubisoft Connect")]

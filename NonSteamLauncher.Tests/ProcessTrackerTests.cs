@@ -432,6 +432,10 @@ public class ProcessTrackerTests
     {
         var epicProcs = DefaultProcessProvider.GetLauncherProcessNames("com.epicgames.launcher://apps/Item?action=launch");
         Assert.Contains("EpicGamesLauncher", epicProcs);
+        Assert.Contains("EpicGamesLauncherUpdate", epicProcs);
+        Assert.Contains("EpicGamesLauncherMigrate", epicProcs);
+        Assert.Contains("EpicGamesLauncherSetup", epicProcs);
+        Assert.Contains("UnrealVersionSelector", epicProcs);
         Assert.DoesNotContain("GalaxyClient", epicProcs);
         Assert.DoesNotContain("EADesktop", epicProcs);
 
@@ -451,6 +455,74 @@ public class ProcessTrackerTests
         // Smart LaunchOptions builder
         Assert.Contains("--close-launcher", NonSteamLauncher.Sync.Steam.SteamSyncService.BuildLaunchOptions("com.epicgames.launcher://apps/Item?action=launch"));
         Assert.DoesNotContain("--close-launcher", NonSteamLauncher.Sync.Steam.SteamSyncService.BuildLaunchOptions(@"C:\Games\The Witcher 3 Wild Hunt GOTY\bin\x64_dx12\witcher3.exe"));
+    }
+
+    [Fact]
+    public async Task RunAsync_EpicUri_ExitsAndClosesLauncher_WhenUnrelatedProcessesStartDuringSession()
+    {
+        var provider = new MockProcessProvider();
+
+        var initialProcs = new List<ProcessInfo>
+        {
+            new(10, "system"),
+            new(20, "EpicGamesLauncher")
+        };
+
+        var gameStartedProcs = new List<ProcessInfo>
+        {
+            new(10, "system"),
+            new(20, "EpicGamesLauncher"),
+            new(21, "EpicGamesLauncherUpdate"),
+            new(22, "msedgewebview2"),
+            new(100, "AlanWake2")
+        };
+
+        // Unrelated background apps start while the game is running
+        var duringGameWithUnrelatedProcs = new List<ProcessInfo>
+        {
+            new(10, "system"),
+            new(20, "EpicGamesLauncher"),
+            new(100, "AlanWake2"),
+            new(200, "python"),
+            new(201, "clang"),
+            new(202, "OAWrapper"),
+            new(203, "Antigravity"),
+            new(204, "SpatialAudioLicenseSrv"),
+            new(205, "taskkill")
+        };
+
+        provider.SnapshotsToReturn = new List<ProcessSnapshot>
+        {
+            new(initialProcs),
+            new(gameStartedProcs),
+            new(duringGameWithUnrelatedProcs)
+        };
+
+        provider.InstanceCounts["AlanWake2"] = 1;
+        provider.InstanceCounts["python"] = 1;
+        provider.InstanceCounts["Antigravity"] = 1;
+
+        var tracker = new ProcessTracker(provider, _logger);
+        var options = new Options
+        {
+            LaunchCommand = "com.epicgames.launcher://apps/UnmappedItem?action=launch&silent=true",
+            CloseLauncher = true,
+            DisableOverlay = true,
+            SyncDelaySeconds = 0,
+            TimeoutSeconds = 5
+        };
+
+        var trackerTask = tracker.RunAsync(options);
+        await Task.Delay(1200);
+
+        // AlanWake2 exits, while python and Antigravity remain running
+        provider.InstanceCounts["AlanWake2"] = 0;
+
+        int exitCode = await trackerTask;
+
+        Assert.Equal(0, exitCode);
+        Assert.True(provider.CloseLauncherCalled);
+        Assert.Equal(options.LaunchCommand, provider.CloseLauncherCommandPassed);
     }
 
     [Theory]

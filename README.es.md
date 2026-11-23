@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="NonSteamLauncher/Assets/Icons/NonSteamLauncher.png" width="128" alt="Non-Steam Launcher Icon" /><br>
-  <strong>v1.10.0</strong><br>
+  <strong>v1.10.1</strong><br>
   <em>El puente perfecto entre launchers de terceros y Steam.</em>
 </p>
 

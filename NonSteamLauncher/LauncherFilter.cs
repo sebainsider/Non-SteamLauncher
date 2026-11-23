@@ -7,6 +7,9 @@ public static class LauncherFilter
         // Epic Games & EOS
         "EpicGamesLauncher",
         "EpicGamesLauncher.exe",
+        "EpicGamesLauncherMigrate",
+        "EpicGamesLauncherSetup",
+        "EpicGamesLauncherUpdate",
         "EpicWebHelper",
         "EpicOnlineServicesHost",
         "EpicOnlineServices",
@@ -19,6 +22,7 @@ public static class LauncherFilter
         "EOSSDK-Win32-Shipping",
         "UnrealEngineLauncher",
         "UnrealEditor",
+        "UnrealVersionSelector",
 
         // Crash Reporters & Utilities
         "CrashReportClient",
@@ -128,6 +132,7 @@ public static class LauncherFilter
         "nvsphelper64",
         "NvTelemetryContainer",
         "NvContainer",
+        "OAWrapper",
         "RadeonSoftware",
         "AMDRSServ",
         "AMDRSSrcExt",
@@ -199,6 +204,8 @@ public static class LauncherFilter
         "consent",
         "msiexec",
         "taskhostw",
+        "taskkill",
+        "SpatialAudioLicenseSrv",
         "WerFault",
         "WerMgr",
         "LauncherBridge",
@@ -209,6 +216,7 @@ public static class LauncherFilter
 
     private static readonly string[] KnownLauncherPrefixes = new[]
     {
+        "EpicGamesLauncher",
         "EpicOnlineServices",
         "EOSOverlayRenderer",
         "EOSSDK",
